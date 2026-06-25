@@ -1,0 +1,72 @@
+@import "tailwindcss";
+
+@theme {
+  /* Brand colors */
+  --color-primary:    #132028;
+  --color-accent:     #F0C12D;
+  --color-background: #F9FAFB;
+  --color-surface:    #FFFFFF;
+  --color-muted:      #6B7280;
+
+  /* Typography */
+  --font-sans: var(--font-inter), ui-sans-serif, system-ui, sans-serif;
+}
+
+*, *::before, *::after {
+  box-sizing: border-box;
+}
+
+body {
+  -webkit-font-smoothing: antialiased;
+  -moz-osx-font-smoothing: grayscale;
+}
+
+/* ── Shimmer animation (used by Skeleton components) ────────────────────────── */
+@keyframes shimmer {
+  0%   { background-position: 200% 0; }
+  100% { background-position: -200% 0; }
+}
+
+/* ── Toast slide-in from right ──────────────────────────────────────────────── */
+@keyframes slideInRight {
+  from { opacity: 0; transform: translateX(120%); }
+  to   { opacity: 1; transform: translateX(0); }
+}
+
+/* ── Toast slide-in from bottom (mobile) ────────────────────────────────────── */
+@keyframes slideInUp {
+  from { opacity: 0; transform: translateY(20px); }
+  to   { opacity: 1; transform: translateY(0); }
+}
+
+/* ── Scrollbar hide utility ─────────────────────────────────────────────────── */
+.scrollbar-hide {
+  -ms-overflow-style: none;
+  scrollbar-width: none;
+}
+.scrollbar-hide::-webkit-scrollbar {
+  display: none;
+}
+
+/* ── Mobile safe-area padding for pages with bottom nav ─────────────────────── */
+.pb-nav {
+  padding-bottom: calc(4rem + env(safe-area-inset-bottom, 0px));
+}
+
+/* ── Smooth page transitions ────────────────────────────────────────────────── */
+@media (prefers-reduced-motion: no-preference) {
+  html {
+    scroll-behavior: smooth;
+  }
+}
+
+/* ── Focus-visible ring (accessible, not intrusive) ────────────────────────── */
+:focus-visible {
+  outline: 2px solid #F0C12D;
+  outline-offset: 2px;
+}
+
+/* ── Tap highlight removal on mobile ────────────────────────────────────────── */
+a, button {
+  -webkit-tap-highlight-color: transparent;
+}

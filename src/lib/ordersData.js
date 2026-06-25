@@ -1,0 +1,160 @@
+export const MOCK_ORDERS = [
+  {
+    id: "BB-20240312-1892",
+    date: "12 Mar 2024",
+    rawDate: "2024-03-12",
+    status: "Delivered",
+    items: [
+      { name: "Bosch GSB 500W Drill Machine", sku: "BSH-500W", qty: 1, price: 1899 },
+      { name: "3M Safety Work Gloves (Pack of 2)", sku: "3M-GLV-02", qty: 1, price: 450 },
+    ],
+    subtotal: 2349,
+    delivery: 0,
+    discount: 0,
+    coupon: null,
+    total: 2349,
+    address: {
+      name: "Ravi Kumar",
+      line1: "204, Sunflower Apartments",
+      line2: "Andheri West",
+      city: "Mumbai",
+      state: "Maharashtra",
+      pincode: "400058",
+      phone: "+91 98765 43210",
+    },
+    payment: { method: "UPI", label: "ravi@paytm" },
+    deliveryDate: "14 Mar 2024",
+    cancelReason: null,
+  },
+  {
+    id: "BB-20240228-0741",
+    date: "28 Feb 2024",
+    rawDate: "2024-02-28",
+    status: "Shipped",
+    items: [
+      { name: "Asian Paints Tractor Emulsion — Brilliant White 4L", sku: "AP-TRC-4L", qty: 2, price: 879 },
+    ],
+    subtotal: 1758,
+    delivery: 99,
+    discount: 0,
+    coupon: null,
+    total: 1857,
+    address: {
+      name: "Ravi Kumar",
+      line1: "204, Sunflower Apartments",
+      line2: "Andheri West",
+      city: "Mumbai",
+      state: "Maharashtra",
+      pincode: "400058",
+      phone: "+91 98765 43210",
+    },
+    payment: { method: "Credit Card", label: "HDFC •••• 4321" },
+    deliveryDate: "3 Mar 2024",
+    cancelReason: null,
+  },
+  {
+    id: "BB-20240219-3301",
+    date: "19 Feb 2024",
+    rawDate: "2024-02-19",
+    status: "Packed",
+    items: [
+      { name: "Stanley FatMax Hand Saw 20-inch", sku: "STN-FSW-20", qty: 1, price: 890 },
+      { name: "Taparia Steel Tape Measure 7.5m", sku: "TAP-STM-75", qty: 2, price: 325 },
+    ],
+    subtotal: 1540,
+    delivery: 0,
+    discount: 154,
+    coupon: "BUILDBUDY10",
+    total: 1386,
+    address: {
+      name: "Ravi Kumar",
+      line1: "Block C, Tech Park",
+      line2: "Powai",
+      city: "Mumbai",
+      state: "Maharashtra",
+      pincode: "400076",
+      phone: "+91 98765 43210",
+    },
+    payment: { method: "UPI", label: "ravi@paytm" },
+    deliveryDate: "22 Feb 2024",
+    cancelReason: null,
+  },
+  {
+    id: "BB-20240108-0022",
+    date: "8 Jan 2024",
+    rawDate: "2024-01-08",
+    status: "Delivered",
+    items: [
+      { name: "Philips LED Panel Light 18W (Pack of 4)", sku: "PHL-LED-18", qty: 1, price: 1200 },
+      { name: "Electrical Wire Roll 1.5mm 90m — Red", sku: "ELW-15-90R", qty: 1, price: 580 },
+    ],
+    subtotal: 1780,
+    delivery: 0,
+    discount: 0,
+    coupon: null,
+    total: 1780,
+    address: {
+      name: "Ravi Kumar",
+      line1: "204, Sunflower Apartments",
+      line2: "Andheri West",
+      city: "Mumbai",
+      state: "Maharashtra",
+      pincode: "400058",
+      phone: "+91 98765 43210",
+    },
+    payment: { method: "Net Banking", label: "SBI" },
+    deliveryDate: "11 Jan 2024",
+    cancelReason: null,
+  },
+  {
+    id: "BB-20231215-9871",
+    date: "15 Dec 2023",
+    rawDate: "2023-12-15",
+    status: "Cancelled",
+    items: [
+      { name: "Makita Angle Grinder 4-inch 720W", sku: "MKT-AG720", qty: 1, price: 3499 },
+    ],
+    subtotal: 3499,
+    delivery: 0,
+    discount: 0,
+    coupon: null,
+    total: 3499,
+    address: {
+      name: "Ravi Kumar",
+      line1: "204, Sunflower Apartments",
+      line2: "Andheri West",
+      city: "Mumbai",
+      state: "Maharashtra",
+      pincode: "400058",
+      phone: "+91 98765 43210",
+    },
+    payment: { method: "UPI", label: "ravi@paytm" },
+    deliveryDate: null,
+    cancelReason: "Cancelled by customer",
+  },
+];
+
+export const STATUS_CONFIG = {
+  "Placed":           { color: "text-blue-600",    bg: "bg-blue-50",    border: "border-blue-200",    dot: "bg-blue-500"    },
+  "Packed":           { color: "text-amber-600",   bg: "bg-amber-50",   border: "border-amber-200",   dot: "bg-amber-500"   },
+  "Shipped":          { color: "text-violet-600",  bg: "bg-violet-50",  border: "border-violet-200",  dot: "bg-violet-500"  },
+  "Out for Delivery": { color: "text-orange-600",  bg: "bg-orange-50",  border: "border-orange-200",  dot: "bg-orange-500"  },
+  "Delivered":        { color: "text-emerald-600", bg: "bg-emerald-50", border: "border-emerald-200", dot: "bg-emerald-500" },
+  "Cancelled":        { color: "text-red-600",     bg: "bg-red-50",     border: "border-red-200",     dot: "bg-red-400"     },
+};
+
+export const TRACKING_STEPS = [
+  { key: "Placed",           label: "Order Placed",      desc: "We've received your order and payment" },
+  { key: "Packed",           label: "Packed",            desc: "Items packed and ready to dispatch"    },
+  { key: "Shipped",          label: "Shipped",           desc: "Order handed over to courier partner"  },
+  { key: "Out for Delivery", label: "Out for Delivery",  desc: "Delivery agent is on the way"          },
+  { key: "Delivered",        label: "Delivered",         desc: "Package delivered successfully"        },
+];
+
+export function getStepIndex(status) {
+  return TRACKING_STEPS.findIndex((s) => s.key === status);
+}
+
+export function getOrderById(id) {
+  return MOCK_ORDERS.find((o) => o.id === id) ?? null;
+}
