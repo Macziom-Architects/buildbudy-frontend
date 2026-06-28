@@ -153,20 +153,14 @@ export default function Navbar() {
               />
             </div>
 
-            {/* Auth buttons — desktop */}
+            {/* Auth button — desktop */}
             {!isLoggedIn && (
-              <div className="hidden md:flex items-center gap-4 flex-shrink-0">
+              <div className="hidden md:flex items-center gap-3 flex-shrink-0">
                 <Link
                   href="/auth/login"
-                  className="text-sm font-medium text-white/70 hover:text-white transition-colors duration-150"
+                  className="text-sm font-semibold bg-accent text-primary rounded-md px-4 py-2 hover:bg-accent/90 transition-colors duration-150"
                 >
-                  Login
-                </Link>
-                <Link
-                  href="/auth/signup"
-                  className="text-sm font-medium bg-accent text-primary rounded-md px-4 py-2 hover:bg-accent/90 transition-colors duration-150"
-                >
-                  Sign Up
+                  Sign In
                 </Link>
               </div>
             )}
@@ -325,20 +319,13 @@ export default function Navbar() {
                 </Link>
               </div>
               {!isLoggedIn && (
-                <div className="mt-2 pt-2 border-t border-white/10 flex items-center gap-3">
+                <div className="mt-2 pt-2 border-t border-white/10">
                   <Link
                     href="/auth/login"
                     onClick={() => setMobileOpen(false)}
-                    className="flex-1 text-center px-4 py-2 text-sm font-medium text-white/70 rounded-lg hover:text-white hover:bg-white/5 transition-colors"
+                    className="flex items-center justify-center w-full px-4 py-2.5 text-sm font-semibold bg-accent text-primary rounded-md hover:bg-accent/90 transition-colors"
                   >
-                    Login
-                  </Link>
-                  <Link
-                    href="/auth/signup"
-                    onClick={() => setMobileOpen(false)}
-                    className="flex-1 text-center px-4 py-2 text-sm font-medium bg-accent text-primary rounded-md hover:bg-accent/90 transition-colors"
-                  >
-                    Sign Up
+                    Sign In / Register
                   </Link>
                 </div>
               )}

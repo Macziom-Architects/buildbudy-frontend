@@ -4,14 +4,14 @@ import { useState } from "react";
 import Link from "next/link";
 import {
   MessageCircle, Package, Truck, RotateCcw, ShieldCheck,
-  Phone, Mail, ChevronDown, ChevronUp, ArrowRight, CheckCircle,
+  Phone, ChevronDown, ChevronUp, ArrowRight, CheckCircle,
 } from "lucide-react";
 import Footer from "@/components/layout/Footer";
 
 const FAQS = [
   {
     q: "How do I track my order?",
-    a: "Visit My Profile → My Orders to see real-time status updates on all your orders. You'll also receive SMS/email updates at each stage.",
+    a: "Visit My Profile → My Orders to see real-time status updates on all your orders. You'll also receive SMS updates at each stage.",
   },
   {
     q: "What is the return policy?",
@@ -31,7 +31,7 @@ const FAQS = [
   },
   {
     q: "How do I get an invoice for my order?",
-    a: "Invoices are automatically sent to your registered email after order confirmation. You can also download them from My Profile → My Orders.",
+    a: "You can download your invoice directly from My Profile → My Orders after order confirmation.",
   },
 ];
 
@@ -67,7 +67,7 @@ function FAQItem({ q, a }) {
 }
 
 export default function HelpPage() {
-  const [form, setForm] = useState({ name: "", email: "", message: "" });
+  const [form, setForm] = useState({ name: "", phone: "", message: "" });
   const [sent, setSent] = useState(false);
 
   function handleSubmit(e) {
@@ -137,7 +137,7 @@ export default function HelpPage() {
             <div className="flex flex-col items-center justify-center py-10 text-center">
               <CheckCircle className="h-12 w-12 text-emerald-500 mb-3" />
               <p className="text-base font-bold text-primary mb-1">Message received!</p>
-              <p className="text-sm text-muted mb-5">We&apos;ll reply to {form.email} within 2 hours.</p>
+              <p className="text-sm text-muted mb-5">We&apos;ll contact you on +91 {form.phone} within 2 hours.</p>
               <Link
                 href="/"
                 className="inline-flex items-center gap-2 text-sm font-semibold text-accent hover:text-accent/80 transition-colors"
@@ -159,15 +159,19 @@ export default function HelpPage() {
                   />
                 </div>
                 <div>
-                  <label className="block text-xs font-semibold text-muted mb-1.5 uppercase tracking-wider">Email</label>
-                  <input
-                    type="email"
-                    value={form.email}
-                    onChange={(e) => setForm((p) => ({ ...p, email: e.target.value }))}
-                    required
-                    placeholder="you@example.com"
-                    className="w-full border border-gray-200 rounded-lg px-3 py-2.5 text-sm text-primary placeholder:text-muted focus:outline-none focus:border-accent focus:ring-1 focus:ring-accent/30 transition-all"
-                  />
+                  <label className="block text-xs font-semibold text-muted mb-1.5 uppercase tracking-wider">Mobile Number</label>
+                  <div className="flex items-center border border-gray-200 rounded-lg overflow-hidden focus-within:border-accent focus-within:ring-1 focus-within:ring-accent/30 transition-all">
+                    <span className="px-3 py-2.5 text-sm font-semibold text-primary border-r border-gray-200 bg-gray-50 flex-shrink-0 select-none">+91</span>
+                    <input
+                      type="tel"
+                      inputMode="numeric"
+                      value={form.phone}
+                      onChange={(e) => setForm((p) => ({ ...p, phone: e.target.value.replace(/\D/g, "").slice(0, 10) }))}
+                      required
+                      placeholder="98765 43210"
+                      className="flex-1 px-3 py-2.5 text-sm text-primary placeholder:text-muted focus:outline-none bg-transparent"
+                    />
+                  </div>
                 </div>
               </div>
               <div>
@@ -201,10 +205,10 @@ export default function HelpPage() {
               </div>
             </div>
             <div className="flex items-center gap-3">
-              <Mail className="h-4 w-4 text-accent flex-shrink-0" />
+              <Phone className="h-4 w-4 text-accent flex-shrink-0" />
               <div>
-                <p className="text-xs font-semibold text-primary">Email</p>
-                <p className="text-xs text-muted">support@buildbudy.com</p>
+                <p className="text-xs font-semibold text-primary">WhatsApp</p>
+                <p className="text-xs text-muted">+91 98765 00000</p>
               </div>
             </div>
           </div>

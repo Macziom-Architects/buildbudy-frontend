@@ -1,21 +1,27 @@
 "use client";
 
 import { useState, useRef, useEffect, Suspense } from "react";
-import { useRouter, useSearchParams } from "next/navigation";
+import { useRouter } from "next/navigation";
+import { Phone, CheckCircle, Loader2 } from "lucide-react";
 
 function OTPForm() {
   const router = useRouter();
-  const searchParams = useSearchParams();
-  const type = searchParams.get("type") || "signup"; // "signup" | "forgot"
-
   const [otp, setOtp] = useState(Array(6).fill(""));
   const [timer, setTimer] = useState(60);
   const [canResend, setCanResend] = useState(false);
+  const [phone, setPhone] = useState("");
+  const [verifying, setVerifying] = useState(false);
   const inputs = useRef([]);
 
   useEffect(() => {
+    const pending = localStorage.getItem("bb_pending_phone");
+    if (!pending) {
+      router.replace("/auth/login");
+      return;
+    }
+    setPhone(pending);
     inputs.current[0]?.focus();
-  }, []);
+  }, [router]);
 
   useEffect(() => {
     if (timer <= 0) { setCanResend(true); return; }
@@ -55,41 +61,48 @@ function OTPForm() {
     inputs.current[0]?.focus();
   }
 
-  function handleVerify() {
+  async function handleVerify() {
     if (otp.join("").length < 6) return;
+    setVerifying(true);
+    await new Promise((res) => setTimeout(res, 600));
 
-    localStorage.setItem("bb_logged_in", "true"); // set once
+    localStorage.setItem("bb_logged_in", "true");
+    localStorage.removeItem("bb_pending_phone");
+    window.dispatchEvent(new Event("storage"));
 
-    if (type === "signup") {
-      router.push("/onboarding");
+    const existingProfile = localStorage.getItem("bb_user_profile");
+    if (existingProfile) {
+      router.push("/");
     } else {
-      router.push("/auth/reset-password");
+      localStorage.setItem(
+        "bb_signup_pending",
+        JSON.stringify({
+          phone: `+91 ${phone}`,
+          memberSince: new Date().toLocaleDateString("en-IN", { month: "short", year: "numeric" }),
+        })
+      );
+      router.push("/onboarding");
     }
   }
 
   const isComplete = otp.every((d) => d !== "");
-
-  const maskedTarget = (() => {
-    try {
-      if (type === "signup") {
-        const d = JSON.parse(localStorage.getItem("bb_signup_pending") || "{}");
-        return d.phone || "your phone";
-      } else {
-        const d = JSON.parse(localStorage.getItem("bb_forgot_target") || "{}");
-        return d.target || "your contact";
-      }
-    } catch {
-      return "your contact";
-    }
-  })();
+  const maskedPhone = phone
+    ? `+91 ${phone.slice(0, 2)}XXXXXX${phone.slice(-2)}`
+    : "your mobile number";
 
   return (
     <main className="h-screen flex items-center justify-center bg-background px-4 overflow-hidden">
       <div className="w-full max-w-md bg-surface rounded-xl shadow-md p-8 text-center">
+        <div className="flex justify-center mb-4">
+          <div className="h-14 w-14 rounded-2xl bg-accent/10 flex items-center justify-center">
+            <Phone className="h-7 w-7 text-accent" />
+          </div>
+        </div>
+
         <h1 className="text-2xl font-bold text-primary mb-1">Verify OTP</h1>
         <p className="text-sm text-muted mb-6">
           Enter the 6-digit code sent to{" "}
-          <span className="text-primary font-medium">{maskedTarget}</span>
+          <span className="text-primary font-semibold">{maskedPhone}</span>
         </p>
 
         <div className="flex gap-2 justify-center mb-6" onPaste={handlePaste}>
@@ -110,29 +123,48 @@ function OTPForm() {
 
         <button
           onClick={handleVerify}
-          disabled={!isComplete}
-          className={`w-full bg-accent text-primary font-bold rounded-md px-4 py-2 transition-colors mb-4 ${
-            isComplete ? "hover:bg-accent/90" : "opacity-40 cursor-not-allowed"
+          disabled={!isComplete || verifying}
+          className={`w-full bg-accent text-primary font-bold rounded-md px-4 py-2.5 transition-colors mb-4 flex items-center justify-center gap-2 ${
+            isComplete && !verifying
+              ? "hover:bg-accent/90 cursor-pointer"
+              : "opacity-40 cursor-not-allowed"
           }`}
         >
-          Verify
+          {verifying ? (
+            <>
+              <Loader2 className="h-4 w-4 animate-spin" />
+              Verifying…
+            </>
+          ) : (
+            <>
+              <CheckCircle className="h-4 w-4" />
+              Verify &amp; Continue
+            </>
+          )}
         </button>
 
         <p className="text-sm text-muted">
           {canResend ? (
             <button
               onClick={handleResend}
-              className="text-primary font-semibold hover:underline"
+              className="text-primary font-semibold hover:underline cursor-pointer"
             >
               Resend OTP
             </button>
           ) : (
             <>
               Resend in{" "}
-              <span className="text-primary font-medium">{timer}s</span>
+              <span className="text-primary font-semibold">{timer}s</span>
             </>
           )}
         </p>
+
+        <button
+          onClick={() => router.push("/auth/login")}
+          className="mt-5 text-xs text-muted hover:text-primary transition-colors cursor-pointer"
+        >
+          ← Change mobile number
+        </button>
       </div>
     </main>
   );

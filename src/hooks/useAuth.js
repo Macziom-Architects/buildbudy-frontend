@@ -1,9 +1,16 @@
 "use client";
 
 import { useState, useEffect, useCallback, useSyncExternalStore } from "react";
-import { login as apiLogin, signup as apiSignup, logout as apiLogout, getProfile, updateProfile as apiUpdateProfile } from "@/lib/api/auth";
+import {
+  requestOtp as apiRequestOtp,
+  verifyOtp as apiVerifyOtp,
+  logout as apiLogout,
+  getProfile,
+  updateProfile as apiUpdateProfile,
+  completeOnboarding as apiCompleteOnboarding,
+} from "@/lib/api/auth";
 
-// ─── Reactive logged-in state ──────────────────────────────────────────────────
+// ─── Reactive auth state ───────────────────────────────────────────────────────
 
 function subscribeAuthState(cb) {
   if (typeof window === "undefined") return () => {};
@@ -22,16 +29,18 @@ function getLoggedIn() {
 // ─── Hook ──────────────────────────────────────────────────────────────────────
 
 /**
- * Auth state hook — reactive to localStorage changes across tabs.
+ * Mobile-first auth hook — reactive to localStorage changes across tabs.
  *
  * Returns:
- *   isLoggedIn  — boolean (reactive)
- *   user        — User object | null
- *   loading     — true while profile is being fetched
- *   login()     — async, throws on invalid credentials
- *   signup()    — async
- *   logout()    — async
- *   updateProfile() — async, updates user state
+ *   isLoggedIn       — boolean (reactive)
+ *   user             — User object | null
+ *   loading          — true while profile is being fetched
+ *   error            — last error | null
+ *   requestOtp()     — async, sends OTP to given phone number
+ *   verifyOtp()      — async, verifies OTP and logs in
+ *   completeOnboarding() — async, saves name + preferences for new users
+ *   logout()         — async
+ *   updateProfile()  — async, updates user state
  */
 export function useAuth() {
   const isLoggedIn = useSyncExternalStore(
@@ -55,11 +64,24 @@ export function useAuth() {
       .catch(() => setLoading(false));
   }, [isLoggedIn]);
 
-  const login = useCallback(async (credentials) => {
+  const requestOtp = useCallback(async (phone) => {
     setLoading(true);
     setError(null);
     try {
-      const result = await apiLogin(credentials);
+      return await apiRequestOtp(phone);
+    } catch (err) {
+      setError(err);
+      throw err;
+    } finally {
+      setLoading(false);
+    }
+  }, []);
+
+  const verifyOtp = useCallback(async (phone, otp) => {
+    setLoading(true);
+    setError(null);
+    try {
+      const result = await apiVerifyOtp(phone, otp);
       setUser(result.user);
       return result;
     } catch (err) {
@@ -70,12 +92,12 @@ export function useAuth() {
     }
   }, []);
 
-  const signup = useCallback(async (data) => {
+  const completeOnboarding = useCallback(async (data) => {
     setLoading(true);
     setError(null);
     try {
-      const result = await apiSignup(data);
-      setUser(result.user);
+      const result = await apiCompleteOnboarding(data);
+      setUser(result);
       return result;
     } catch (err) {
       setError(err);
@@ -96,5 +118,15 @@ export function useAuth() {
     return updated;
   }, []);
 
-  return { isLoggedIn, user, loading, error, login, signup, logout, updateProfile };
+  return {
+    isLoggedIn,
+    user,
+    loading,
+    error,
+    requestOtp,
+    verifyOtp,
+    completeOnboarding,
+    logout,
+    updateProfile,
+  };
 }

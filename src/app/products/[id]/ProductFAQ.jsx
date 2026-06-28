@@ -22,7 +22,7 @@ const FAQS = [
   },
   {
     q: "How do I track my order after purchase?",
-    a: "Once your order is placed, you'll receive email and SMS updates at every stage. You can also track your order live from My Profile → My Orders.",
+    a: "Once your order is placed, you'll receive SMS updates at every stage. You can also track your order live from My Profile → My Orders.",
   },
 ];
 

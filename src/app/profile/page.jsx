@@ -6,10 +6,10 @@ import { useRouter, useSearchParams } from "next/navigation";
 import {
   User, MapPin, ShoppingBag, Heart, CreditCard, Settings,
   LogOut, ChevronRight, Plus, Edit2, Trash2, Shield,
-  Package, CheckCircle, Clock, Truck, Home, Bell, Lock,
-  Phone, Mail, Camera, X, Loader2, Building2, ArrowRight,
-  Star, Tag, BookOpen, Wrench, AlertCircle, CheckCircle2,
-  XCircle, Calendar,
+  Package, CheckCircle, Clock, Truck, Home, Bell,
+  Phone, Camera, X, Loader2, Building2, ArrowRight,
+  Tag, BookOpen, Wrench, CheckCircle2,
+  XCircle,
 } from "lucide-react";
 import Footer from "@/components/layout/Footer";
 import { useWishlist } from "@/context/WishlistContext";
@@ -21,7 +21,6 @@ import { Suspense } from "react";
 
 const MOCK_USER = {
   name: "Ravi Kumar",
-  email: "ravi.kumar@example.com",
   phone: "+91 98765 43210",
   avatar: null,
   memberSince: "Jan 2024",
@@ -599,7 +598,7 @@ function SettingsSection() {
   const [user, setUser] = useState(MOCK_USER);
   const [saved, setSaved] = useState(false);
   const [saving, setSaving] = useState(false);
-  const [notifications, setNotifications] = useState({ email: true, sms: true, push: false });
+  const [notifications, setNotifications] = useState({ sms: true, push: false });
 
   useEffect(() => { setUser(loadUser()); }, []);
 
@@ -626,18 +625,19 @@ function SettingsSection() {
             </div>
           </div>
           <div>
-            <label className="block text-xs font-semibold text-muted mb-1.5 uppercase tracking-wider">Email Address</label>
-            <div className="relative">
-              <Mail className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-gray-400" />
-              <input value={user.email} onChange={(e) => setUser((p) => ({ ...p, email: e.target.value }))} type="email" className={inputCls} />
-            </div>
-          </div>
-          <div>
-            <label className="block text-xs font-semibold text-muted mb-1.5 uppercase tracking-wider">Phone Number</label>
+            <label className="block text-xs font-semibold text-muted mb-1.5 uppercase tracking-wider">Mobile Number</label>
             <div className="relative">
               <Phone className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-gray-400" />
-              <input value={user.phone} onChange={(e) => setUser((p) => ({ ...p, phone: e.target.value }))} className={inputCls} />
+              <input
+                value={user.phone}
+                readOnly
+                title="Mobile number is verified and cannot be changed here"
+                className={`${inputCls} bg-gray-50 cursor-not-allowed`}
+              />
             </div>
+            <p className="text-[11px] text-muted mt-1 flex items-center gap-1">
+              <Shield className="h-3 w-3 text-emerald-500" /> Verified number — contact support to change
+            </p>
           </div>
         </div>
         <div className="mt-5 flex items-center gap-3">
@@ -652,9 +652,8 @@ function SettingsSection() {
       <SectionWrapper title="Notification Preferences" subtitle="Choose how you hear from us">
         <div className="space-y-4">
           {[
-            { key: "email", label: "Email Notifications", sub: "Order updates, promotions, and newsletters" },
-            { key: "sms",   label: "SMS Alerts",          sub: "Delivery updates and OTP messages" },
-            { key: "push",  label: "Push Notifications",  sub: "Browser and app alerts" },
+            { key: "sms",  label: "SMS Alerts",         sub: "Delivery updates and OTP messages" },
+            { key: "push", label: "Push Notifications", sub: "Browser and app alerts" },
           ].map(({ key, label, sub }) => (
             <div key={key} className="flex items-center justify-between gap-4">
               <div>
@@ -673,30 +672,18 @@ function SettingsSection() {
         </div>
       </SectionWrapper>
 
-      <SectionWrapper title="Security" subtitle="Manage your password and account security">
+      <SectionWrapper title="Security" subtitle="Manage your account security">
         <div className="space-y-3">
-          {[
-            { icon: Lock,   label: "Change Password",           sub: "Last changed 3 months ago",       href: "/auth/forgot-password" },
-            { icon: Shield, label: "Two-Factor Authentication", sub: "Add an extra layer of security",  href: null },
-          ].map(({ icon: Icon, label, sub, href }) => {
-            const Wrapper = href ? Link : "button";
-            return (
-              <Wrapper
-                key={label}
-                {...(href ? { href } : {})}
-                className="w-full flex items-center gap-4 p-4 rounded-xl hover:bg-gray-50 transition-colors text-left cursor-pointer group"
-              >
-                <div className="h-9 w-9 rounded-xl bg-primary/5 flex items-center justify-center flex-shrink-0 group-hover:bg-primary/10 transition-colors">
-                  <Icon className="h-4 w-4 text-primary" />
-                </div>
-                <div className="flex-1 min-w-0">
-                  <p className="text-sm font-semibold text-primary">{label}</p>
-                  <p className="text-xs text-muted">{sub}</p>
-                </div>
-                <ChevronRight className="h-4 w-4 text-gray-400 group-hover:text-primary transition-colors flex-shrink-0" />
-              </Wrapper>
-            );
-          })}
+          <div className="flex items-center gap-4 p-4 rounded-xl bg-emerald-50 border border-emerald-100">
+            <div className="h-9 w-9 rounded-xl bg-emerald-100 flex items-center justify-center flex-shrink-0">
+              <Shield className="h-4 w-4 text-emerald-600" />
+            </div>
+            <div className="flex-1 min-w-0">
+              <p className="text-sm font-semibold text-primary">Mobile OTP Verified</p>
+              <p className="text-xs text-muted">Your account is secured with mobile OTP authentication</p>
+            </div>
+            <CheckCircle2 className="h-5 w-5 text-emerald-500 flex-shrink-0" />
+          </div>
         </div>
       </SectionWrapper>
     </div>
@@ -786,7 +773,7 @@ function ProfilePageInner() {
             {/* Info */}
             <div className="flex-1 min-w-0">
               <h1 className="text-xl font-bold text-white">{user.name}</h1>
-              <p className="text-sm text-white/60 mt-0.5">{user.email}</p>
+              <p className="text-sm text-white/60 mt-0.5">BuildBudy Member</p>
               <div className="flex flex-wrap items-center gap-3 mt-2.5">
                 {user.phone && (
                   <span className="inline-flex items-center gap-1.5 text-xs text-white/50">

@@ -28,7 +28,7 @@ const LINK_GROUPS = [
       { label: "My Profile",   href: "/profile" },
       { label: "My Orders",    href: "/profile" },
       { label: "Addresses",    href: "/profile" },
-      { label: "Sign Up",      href: "/auth/signup" },
+      { label: "Sign In",       href: "/auth/login" },
     ],
   },
 ];

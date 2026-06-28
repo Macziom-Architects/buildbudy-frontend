@@ -1,11 +1,10 @@
-import { USE_MOCK, MOCK_DELAY_MS, delay, apiPost, apiGet, apiPut, setToken, getToken } from "./client";
+import { USE_MOCK, MOCK_DELAY_MS, delay, apiPost, apiGet, apiPut, setToken } from "./client";
 
 // ─── Mock user ─────────────────────────────────────────────────────────────────
 
 const BASE_USER = {
   id: "usr_001",
   name: "Ravi Kumar",
-  email: "ravi.kumar@example.com",
   phone: "+91 98765 43210",
   memberSince: "Jan 2024",
   verified: true,
@@ -24,57 +23,69 @@ function readStoredUser() {
 // ─── Auth API ──────────────────────────────────────────────────────────────────
 
 /**
- * Sign in with email + password.
- * Returns { token, user }.
+ * Request an OTP for the given Indian mobile number.
+ * Returns { ok: true }.
  */
-export async function login({ email, password }) {
+export async function requestOtp(phone) {
   if (USE_MOCK) {
     await delay(MOCK_DELAY_MS);
-    if (!email || !password || password.length < 6) {
-      const err = new Error("Invalid credentials");
+    if (!phone || !/^[6-9]\d{9}$/.test(phone.replace(/\D/g, ""))) {
+      const err = new Error("Invalid mobile number");
+      err.status = 400;
+      throw err;
+    }
+    localStorage.setItem("bb_pending_phone", phone.replace(/\D/g, ""));
+    return { ok: true };
+  }
+  return apiPost("/auth/otp/request", { phone }, { token: null });
+}
+
+/**
+ * Verify OTP and sign in (or auto-register) the user.
+ * Returns { token, user, isNewUser }.
+ */
+export async function verifyOtp(phone, otp) {
+  if (USE_MOCK) {
+    await delay(MOCK_DELAY_MS);
+    if (!otp || otp.length < 6) {
+      const err = new Error("Invalid OTP");
       err.status = 401;
       throw err;
     }
     const token = `mock_${Date.now()}`;
+    const existingProfile = localStorage.getItem("bb_user_profile");
+    const isNewUser = !existingProfile;
+    const user = existingProfile
+      ? { ...BASE_USER, ...JSON.parse(existingProfile) }
+      : { ...BASE_USER, phone: `+91 ${phone}` };
     localStorage.setItem("bb_logged_in", "1");
     setToken(token);
     window.dispatchEvent(new Event("storage"));
-    return { token, user: readStoredUser() };
+    return { token, user, isNewUser };
   }
-  const data = await apiPost("/auth/login", { email, password }, { token: null });
+  const data = await apiPost("/auth/otp/verify", { phone, otp }, { token: null });
   setToken(data.token);
   return data;
 }
 
 /**
- * Register a new account.
- * Returns { token, user }.
+ * Complete onboarding for a new user.
+ * Returns the updated User object.
  */
-export async function signup({ name, email, phone, password }) {
+export async function completeOnboarding({ name, phone, preferences }) {
   if (USE_MOCK) {
     await delay(MOCK_DELAY_MS);
-    const token = `mock_${Date.now()}`;
-    const user = { ...BASE_USER, name, email, phone };
-    localStorage.setItem("bb_logged_in", "1");
-    localStorage.setItem("bb_user_profile", JSON.stringify({ name, email, phone }));
-    setToken(token);
-    window.dispatchEvent(new Event("storage"));
-    return { token, user };
+    const user = {
+      ...BASE_USER,
+      name,
+      phone,
+      memberSince: new Date().toLocaleDateString("en-IN", { month: "short", year: "numeric" }),
+    };
+    localStorage.setItem("bb_user_profile", JSON.stringify({ name, phone, memberSince: user.memberSince }));
+    localStorage.setItem("bb_onboarding", JSON.stringify(preferences ?? {}));
+    return user;
   }
-  const data = await apiPost("/auth/signup", { name, email, phone, password }, { token: null });
-  setToken(data.token);
-  return data;
-}
-
-/**
- * Send a password-reset email.
- */
-export async function requestPasswordReset(email) {
-  if (USE_MOCK) {
-    await delay(MOCK_DELAY_MS);
-    return { ok: true };
-  }
-  return apiPost("/auth/password/reset", { email }, { token: null });
+  return apiPost("/auth/onboarding", { name, phone, preferences });
 }
 
 /**
@@ -117,7 +128,7 @@ export async function updateProfile(patch) {
     await delay(MOCK_DELAY_MS);
     const current = readStoredUser();
     const updated = { ...current, ...patch };
-    localStorage.setItem("bb_user_profile", JSON.stringify(patch));
+    localStorage.setItem("bb_user_profile", JSON.stringify({ name: updated.name, phone: updated.phone, memberSince: updated.memberSince }));
     return updated;
   }
   return apiPut("/auth/profile", patch);
