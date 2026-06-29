@@ -55,8 +55,7 @@ export default function CartPage() {
   }
 
   function handleCheckout() {
-    const saved = typeof window !== "undefined" && localStorage.getItem("bb_address");
-    router.push(saved ? "/checkout/payment" : "/checkout/address");
+    router.push("/checkout/address");
   }
 
   const subtotal   = cartItems.reduce((sum, item) => sum + item.price * item.quantity, 0);

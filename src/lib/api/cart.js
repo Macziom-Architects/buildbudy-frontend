@@ -40,3 +40,12 @@ export async function removeFromCart(supplierProductId) {
 export async function clearCart() {
   return apiDelete("/cart");
 }
+
+/**
+ * POST /cart/checkout → creates the order + a Razorpay order, returns
+ * { orderId, orderNumber, totalPaise, razorpayOrderId, razorpayKeyId }.
+ * The backend clears the cart as part of this call.
+ */
+export async function checkoutCart(addressId, buyerGstin) {
+  return apiPost("/cart/checkout", { addressId, buyerGstin });
+}

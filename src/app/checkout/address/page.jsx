@@ -2,265 +2,123 @@
 
 import { useEffect, useState } from "react";
 import { useRouter } from "next/navigation";
-import { useCart } from "@/context/CartContext";
+import Link from "next/link";
+import { MapPin, Home, Building2, Plus, Loader2, Check } from "lucide-react";
+import { listAddresses } from "@/lib/api/addresses";
 
-const INDIAN_STATES = [
-  "Andhra Pradesh","Arunachal Pradesh","Assam","Bihar","Chhattisgarh",
-  "Goa","Gujarat","Haryana","Himachal Pradesh","Jharkhand","Karnataka",
-  "Kerala","Madhya Pradesh","Maharashtra","Manipur","Meghalaya","Mizoram",
-  "Nagaland","Odisha","Punjab","Rajasthan","Sikkim","Tamil Nadu","Telangana",
-  "Tripura","Uttar Pradesh","Uttarakhand","West Bengal",
-  "Andaman and Nicobar Islands","Chandigarh","Dadra and Nagar Haveli and Daman and Diu",
-  "Delhi","Jammu and Kashmir","Ladakh","Lakshadweep","Puducherry",
+const STEPS = [
+  { num: "01", label: "Shipping" },
+  { num: "02", label: "Review & Pay" },
 ];
 
-const EMPTY_FORM = {
-  fullName: "",
-  phone: "",
-  pincode: "",
-  addressLine1: "",
-  addressLine2: "",
-  landmark: "",
-  city: "",
-  state: "",
-};
-
-function formatPrice(price) {
-  return `₹${price.toLocaleString("en-IN")}`;
-}
-
-export default function AddressPage() {
+export default function CheckoutAddressPage() {
   const router = useRouter();
-  const { cartItems } = useCart();
-  const [form, setForm] = useState(EMPTY_FORM);
-  const [saveAddress, setSaveAddress] = useState(true);
-  const [errors, setErrors] = useState({});
+  const [addresses, setAddresses] = useState(null); // null = loading
+  const [selectedId, setSelectedId] = useState(null);
 
   useEffect(() => {
-    const saved = localStorage.getItem("bb_address");
-    if (saved) {
-      router.replace("/checkout/payment");
-    }
-  }, [router]);
-
-  const subtotal = cartItems.reduce((s, i) => s + i.price * i.quantity, 0);
-  const discount = subtotal * 0.1;
-  const delivery = subtotal > 999 ? 0 : 99;
-  const total = subtotal - discount + delivery;
-
-  function validate() {
-    const e = {};
-    if (!form.fullName.trim()) e.fullName = "Full name is required";
-    if (!/^[6-9]\d{9}$/.test(form.phone)) e.phone = "Enter a valid 10-digit mobile number";
-    if (!/^\d{6}$/.test(form.pincode)) e.pincode = "Enter a valid 6-digit pincode";
-    if (!form.addressLine1.trim()) e.addressLine1 = "Address Line 1 is required";
-    if (!form.city.trim()) e.city = "City is required";
-    if (!form.state) e.state = "Please select a state";
-    return e;
-  }
-
-  function handleChange(e) {
-    const { name, value } = e.target;
-    setForm((prev) => ({ ...prev, [name]: value }));
-    if (errors[name]) setErrors((prev) => ({ ...prev, [name]: undefined }));
-  }
-
-  function handleSubmit(e) {
-    e.preventDefault();
-    const e2 = validate();
-    if (Object.keys(e2).length) {
-      setErrors(e2);
+    if (typeof window !== "undefined" && !localStorage.getItem("bb_logged_in")) {
+      router.replace("/auth/login");
       return;
     }
-    if (saveAddress) {
-      localStorage.setItem("bb_address", JSON.stringify(form));
-    }
-    router.push("/checkout/payment");
+    listAddresses()
+      .then((list) => {
+        setAddresses(list);
+        const def = list.find((a) => a.isDefault) ?? list[0];
+        if (def) setSelectedId(def.id);
+      })
+      .catch(() => setAddresses([]));
+  }, [router]);
+
+  function handleContinue() {
+    const addr = addresses.find((a) => a.id === selectedId);
+    if (!addr) return;
+    sessionStorage.setItem("bb_checkout_addr", JSON.stringify(addr));
+    router.push("/checkout/review");
   }
 
   return (
     <main className="min-h-screen bg-[#F5F7FA]">
-      <div className="max-w-7xl mx-auto px-4 md:px-6 xl:px-8 py-8">
-        {/* TITLE */}
+      <div className="max-w-3xl mx-auto px-4 md:px-6 py-8">
+
+        {/* Stepper */}
+        <div className="flex items-center gap-0 mb-8">
+          {STEPS.map((step, idx) => (
+            <div key={step.num} className="flex items-center">
+              <div className={`flex items-center gap-2 px-3 py-1.5 rounded ${idx === 0 ? "bg-primary text-white" : "text-gray-400"}`}>
+                <span className={`text-xs font-bold ${idx === 0 ? "text-accent" : "text-gray-400"}`}>{step.num}</span>
+                <span className={`text-xs font-semibold ${idx === 0 ? "text-white" : "text-gray-400"}`}>{step.label}</span>
+              </div>
+              {idx < STEPS.length - 1 && <span className="mx-1 text-gray-300 text-xs">›</span>}
+            </div>
+          ))}
+        </div>
+
         <h1 className="text-2xl font-extrabold text-primary tracking-tight">Delivery Address</h1>
-        <p className="text-sm text-muted mt-0.5">Where should we deliver your order?</p>
+        <p className="text-sm text-muted mt-0.5">Choose where you&apos;d like this order delivered.</p>
 
-        <div className="mt-6 grid lg:grid-cols-[1fr_340px] gap-5 items-start">
-          {/* LEFT — FORM */}
-          <div className="bg-white rounded-lg shadow-sm p-6">
-            <form onSubmit={handleSubmit} noValidate className="space-y-4">
-              {/* Row 1: Full Name + Phone */}
-              <div className="grid sm:grid-cols-2 gap-4">
-                <Field
-                  label="Full Name"
-                  name="fullName"
-                  placeholder="John Doe"
-                  value={form.fullName}
-                  onChange={handleChange}
-                  error={errors.fullName}
-                />
-                <Field
-                  label="Phone Number"
-                  name="phone"
-                  type="tel"
-                  placeholder="10-digit mobile number"
-                  value={form.phone}
-                  onChange={handleChange}
-                  error={errors.phone}
-                  maxLength={10}
-                />
+        <div className="mt-6 space-y-3">
+          {addresses === null ? (
+            <div className="flex items-center justify-center gap-2 py-16 text-sm text-muted">
+              <Loader2 className="h-4 w-4 animate-spin" /> Loading your addresses…
+            </div>
+          ) : addresses.length === 0 ? (
+            <div className="bg-white rounded-lg shadow-sm p-8 text-center">
+              <div className="mx-auto mb-4 flex h-14 w-14 items-center justify-center rounded-2xl bg-gray-100">
+                <MapPin className="h-7 w-7 text-gray-400" />
               </div>
+              <p className="text-sm font-bold text-primary mb-1">No saved addresses</p>
+              <p className="text-xs text-muted mb-5">Add a delivery address to continue checkout.</p>
+              <Link href="/profile?section=addresses" className="inline-flex items-center gap-2 bg-primary text-white text-sm font-semibold px-5 py-2.5 rounded-xl hover:bg-primary/90 transition-colors">
+                <Plus className="h-4 w-4" /> Add an Address
+              </Link>
+            </div>
+          ) : (
+            <>
+              {addresses.map((addr) => {
+                const selected = addr.id === selectedId;
+                const Icon = addr.label === "Home" ? Home : addr.label === "Office" ? Building2 : MapPin;
+                return (
+                  <button
+                    key={addr.id}
+                    onClick={() => setSelectedId(addr.id)}
+                    className={`w-full text-left flex items-start gap-3 rounded-xl border-2 bg-white p-4 transition-all cursor-pointer ${
+                      selected ? "border-accent shadow-sm" : "border-gray-100 hover:border-gray-200"
+                    }`}
+                  >
+                    <div className={`mt-0.5 flex h-9 w-9 flex-shrink-0 items-center justify-center rounded-lg ${selected ? "bg-accent/20" : "bg-primary/5"}`}>
+                      <Icon className="h-4 w-4 text-primary" />
+                    </div>
+                    <div className="flex-1 min-w-0">
+                      <div className="flex items-center gap-2">
+                        <span className="text-sm font-bold text-primary">{addr.label}</span>
+                        {addr.isDefault && <span className="text-[10px] font-bold bg-accent text-primary px-2 py-0.5 rounded-full">Default</span>}
+                      </div>
+                      <p className="text-xs text-muted mt-1">{addr.line1}{addr.line2 ? `, ${addr.line2}` : ""}</p>
+                      <p className="text-xs text-muted">{addr.city}, {addr.state} — {addr.pincode}</p>
+                    </div>
+                    <div className={`mt-0.5 flex h-5 w-5 flex-shrink-0 items-center justify-center rounded-full border-2 ${selected ? "border-accent bg-accent" : "border-gray-300"}`}>
+                      {selected && <Check className="h-3 w-3 text-primary" />}
+                    </div>
+                  </button>
+                );
+              })}
 
-              {/* Row 2: Pincode + City */}
-              <div className="grid sm:grid-cols-2 gap-4">
-                <Field
-                  label="Pincode"
-                  name="pincode"
-                  placeholder="6-digit pincode"
-                  value={form.pincode}
-                  onChange={handleChange}
-                  error={errors.pincode}
-                  maxLength={6}
-                />
-                <Field
-                  label="City"
-                  name="city"
-                  placeholder="Your city"
-                  value={form.city}
-                  onChange={handleChange}
-                  error={errors.city}
-                />
-              </div>
+              <Link href="/profile?section=addresses" className="flex items-center justify-center gap-2 rounded-xl border-2 border-dashed border-gray-200 py-3 text-sm font-semibold text-gray-500 hover:border-accent hover:text-primary transition-all">
+                <Plus className="h-4 w-4" /> Add a new address
+              </Link>
 
-              {/* Address Lines */}
-              <Field
-                label="Address Line 1 *"
-                name="addressLine1"
-                placeholder="House / Flat no., Building, Street"
-                value={form.addressLine1}
-                onChange={handleChange}
-                error={errors.addressLine1}
-              />
-              <div className="grid sm:grid-cols-2 gap-4">
-                <Field
-                  label="Address Line 2"
-                  name="addressLine2"
-                  placeholder="Area, Colony (optional)"
-                  value={form.addressLine2}
-                  onChange={handleChange}
-                />
-                <Field
-                  label="Landmark"
-                  name="landmark"
-                  placeholder="Near school, temple… (optional)"
-                  value={form.landmark}
-                  onChange={handleChange}
-                />
-              </div>
-
-              {/* State */}
-              <div>
-                <label className="block text-xs font-semibold text-primary mb-1">
-                  State
-                </label>
-                <select
-                  name="state"
-                  value={form.state}
-                  onChange={handleChange}
-                  className={`w-full h-10 border rounded px-3 text-sm bg-white text-primary focus:outline-none focus:ring-1 focus:ring-primary ${
-                    errors.state ? "border-red-400" : "border-gray-300"
-                  }`}
-                >
-                  <option value="">Select state</option>
-                  {INDIAN_STATES.map((s) => (
-                    <option key={s} value={s}>{s}</option>
-                  ))}
-                </select>
-                {errors.state && (
-                  <p className="text-red-500 text-xs mt-1">{errors.state}</p>
-                )}
-              </div>
-
-              {/* Save checkbox */}
-              <label className="flex items-center gap-2 cursor-pointer select-none">
-                <input
-                  type="checkbox"
-                  checked={saveAddress}
-                  onChange={(e) => setSaveAddress(e.target.checked)}
-                  className="w-4 h-4 accent-[#F0C12D]"
-                />
-                <span className="text-sm text-primary">Save this address for future orders</span>
-              </label>
-
-              {/* CTA */}
               <button
-                type="submit"
-                className="w-full bg-accent text-primary font-bold py-2.5 rounded hover:opacity-80 active:scale-[0.98] cursor-pointer transition-all text-sm tracking-wide mt-2"
+                onClick={handleContinue}
+                disabled={!selectedId}
+                className="w-full mt-2 bg-accent text-primary font-bold py-3 rounded-xl hover:opacity-90 active:scale-[0.99] transition-all text-sm tracking-wide disabled:opacity-50 disabled:cursor-not-allowed cursor-pointer"
               >
-                CONTINUE TO PAYMENT
+                Continue to Review &amp; Pay
               </button>
-            </form>
-          </div>
-
-          {/* RIGHT — ORDER SUMMARY */}
-          <div className="bg-[#0F1E25] text-white p-5 rounded-lg h-fit sticky top-24 shadow-md">
-            <h2 className="font-bold text-base tracking-wide uppercase border-b border-white/10 pb-3">
-              Order Summary
-            </h2>
-
-            <div className="mt-3 space-y-2.5 text-sm">
-              <div className="flex justify-between items-center">
-                <span className="text-gray-400">Subtotal</span>
-                <span className="font-medium">{formatPrice(subtotal)}</span>
-              </div>
-              <div className="flex justify-between items-center">
-                <span className="text-gray-400">Discount (10%)</span>
-                <span className="text-green-400 font-medium">−{formatPrice(discount)}</span>
-              </div>
-              <div className="flex justify-between items-center">
-                <span className="text-gray-400">Delivery</span>
-                <span className="font-medium">
-                  {delivery === 0 ? (
-                    <span className="text-green-400">Free</span>
-                  ) : (
-                    formatPrice(delivery)
-                  )}
-                </span>
-              </div>
-              <div className="border-t border-white/10 pt-3 flex justify-between items-center font-bold text-base">
-                <span>Total</span>
-                <span className="text-accent text-lg">{formatPrice(total)}</span>
-              </div>
-            </div>
-
-            <div className="mt-4 text-xs text-gray-500 space-y-1.5">
-              <p>✔ Secure payments</p>
-              <p>✔ Fast delivery</p>
-              <p>✔ 30-day guarantee</p>
-            </div>
-          </div>
+            </>
+          )}
         </div>
       </div>
     </main>
-  );
-}
-
-function Field({ label, name, type = "text", placeholder, value, onChange, error, maxLength }) {
-  return (
-    <div>
-      <label className="block text-xs font-semibold text-primary mb-1">{label}</label>
-      <input
-        type={type}
-        name={name}
-        placeholder={placeholder}
-        value={value}
-        onChange={onChange}
-        maxLength={maxLength}
-        className={`w-full h-10 border rounded px-3 text-sm text-primary placeholder-gray-400 focus:outline-none focus:ring-1 focus:ring-primary ${
-          error ? "border-red-400" : "border-gray-300"
-        }`}
-      />
-      {error && <p className="text-red-500 text-xs mt-1">{error}</p>}
-    </div>
   );
 }

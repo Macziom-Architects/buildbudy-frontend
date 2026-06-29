@@ -1,35 +1,21 @@
 "use client";
 
-import { useEffect, useState } from "react";
-import { useRouter } from "next/navigation";
+import { Suspense, useEffect, useState } from "react";
+import { useRouter, useSearchParams } from "next/navigation";
 import Image from "next/image";
 import Link from "next/link";
-import ProductCard from "@/components/product/ProductCard";
+import { Loader2 } from "lucide-react";
 import Footer from "@/components/layout/Footer";
-import { getProducts } from "@/lib/products";
-
-const recommended = getProducts().slice(0, 4);
+import { getOrderById } from "@/lib/api/orders";
 
 function formatPrice(p) {
-  return `₹${p.toLocaleString("en-IN")}`;
+  return `₹${(p ?? 0).toLocaleString("en-IN")}`;
 }
 
 function deliveryEstimate() {
   const d = new Date();
   d.setDate(d.getDate() + 5);
   return d.toLocaleDateString("en-IN", { weekday: "long", day: "numeric", month: "long", year: "numeric" });
-}
-
-function paymentLabel(payment) {
-  if (!payment) return "—";
-  if (payment.method === "card") {
-    const last4 = payment.card?.number?.replace(/\s/g, "").slice(-4);
-    return `Card ending in ${last4 || "****"}`;
-  }
-  if (payment.method === "upi") return `UPI — ${payment.upi?.id || ""}`;
-  if (payment.method === "netbanking") return `Net Banking — ${payment.bank || ""}`;
-  if (payment.method === "cod") return "Cash on Delivery";
-  return "—";
 }
 
 const TIMELINE = [
@@ -39,167 +25,136 @@ const TIMELINE = [
   { label: "Delivered", sub: "Enjoy your purchase!" },
 ];
 
+const STATUS_STEP = { Placed: 0, Packed: 0, Shipped: 1, "Out for Delivery": 2, Delivered: 3 };
+
 const FEATURES = [
   { icon: "🔒", title: "Secure Payments", desc: "All transactions are encrypted and safe." },
   { icon: "↩️", title: "Easy Returns", desc: "30-day hassle-free return policy." },
   { icon: "🚚", title: "Fast Delivery", desc: "Delivered in 3–5 business days." },
 ];
 
-export default function OrderSuccessPage() {
+function SuccessContent() {
   const router = useRouter();
-  const [orderData, setOrderData] = useState(null);
+  const searchParams = useSearchParams();
+  const orderId = searchParams.get("orderId");
+  const [order, setOrder] = useState(null);
+  const [loading, setLoading] = useState(true);
 
   useEffect(() => {
-    const raw = sessionStorage.getItem("bb_order_data");
-    if (!raw) { router.replace("/"); return; }
-    setOrderData(JSON.parse(raw));
-  }, [router]);
+    if (!orderId) { router.replace("/"); return; }
+    let active = true;
+    getOrderById(orderId)
+      .then((o) => { if (active) setOrder(o); })
+      .catch(() => {})
+      .finally(() => { if (active) setLoading(false); });
+    return () => { active = false; };
+  }, [orderId, router]);
 
-  if (!orderData) return null;
+  if (loading) {
+    return (
+      <div className="min-h-screen bg-[#F5F7FA] flex items-center justify-center gap-2 text-sm text-muted">
+        <Loader2 className="h-5 w-5 animate-spin" /> Loading your order…
+      </div>
+    );
+  }
 
-  const { orderId, address, payment, items } = orderData;
-  const subtotal = items.reduce((s, i) => s + i.price * i.quantity, 0);
-  const discount = subtotal * 0.1;
-  const delivery = subtotal > 999 ? 0 : 99;
-  const total = subtotal - discount + delivery;
+  if (!order) {
+    return (
+      <div className="min-h-screen bg-[#F5F7FA] flex flex-col items-center justify-center px-4 text-center">
+        <h1 className="text-xl font-bold text-primary mb-2">Order not found</h1>
+        <p className="text-sm text-muted mb-6">We couldn&apos;t find that order.</p>
+        <Link href="/orders" className="bg-primary text-white text-sm font-semibold px-5 py-3 rounded-xl hover:bg-primary/90 transition-colors">View My Orders</Link>
+      </div>
+    );
+  }
+
+  const doneIndex = STATUS_STEP[order.status] ?? 0;
+  const { address } = order;
 
   return (
     <>
       <main className="min-h-screen bg-[#F5F7FA]">
-        <div className="max-w-7xl mx-auto px-4 md:px-6 xl:px-8 py-10 space-y-8">
+        <div className="max-w-5xl mx-auto px-4 md:px-6 xl:px-8 py-10 space-y-8">
 
-          {/* ── SUCCESS HERO ─────────────────────────────── */}
+          {/* Hero */}
           <div className="bg-white rounded-lg shadow-sm p-8 flex flex-col items-center text-center">
-            <div className="w-16 h-16 rounded-full bg-green-100 flex items-center justify-center text-3xl mb-4">
-              ✓
-            </div>
+            <div className="w-16 h-16 rounded-full bg-green-100 flex items-center justify-center text-3xl mb-4">✓</div>
             <h1 className="text-2xl font-extrabold text-primary tracking-tight">Order Confirmed!</h1>
             <p className="text-sm text-muted mt-1 max-w-md">
               Thanks for shopping with BuildBudy. Your order has been placed and is being processed.
             </p>
             <p className="mt-3 text-xs font-semibold text-gray-500 bg-gray-100 px-3 py-1.5 rounded-full">
-              Order ID: <span className="text-primary font-bold">{orderId}</span>
+              Order: <span className="text-primary font-bold">{order.orderNumber ?? order.id}</span>
             </p>
             <div className="mt-5 flex gap-3 flex-wrap justify-center">
-              <button className="border border-primary text-primary text-sm font-semibold px-5 py-2 rounded hover:bg-primary hover:text-white active:scale-[0.98] cursor-pointer transition-all">
+              <Link href={`/orders/${order.id}`} className="border border-primary text-primary text-sm font-semibold px-5 py-2 rounded hover:bg-primary hover:text-white active:scale-[0.98] cursor-pointer transition-all">
                 Track Order
-              </button>
-              <Link
-                href="/"
-                className="bg-accent text-primary text-sm font-bold px-5 py-2 rounded hover:opacity-80 active:scale-[0.98] cursor-pointer transition-all"
-              >
+              </Link>
+              <Link href="/products" className="bg-accent text-primary text-sm font-bold px-5 py-2 rounded hover:opacity-80 active:scale-[0.98] cursor-pointer transition-all">
                 Continue Shopping
               </Link>
             </div>
           </div>
 
-          {/* ── ORDER STATUS TIMELINE ─────────────────────── */}
+          {/* Timeline */}
           <div className="bg-white rounded-lg shadow-sm p-6">
             <h2 className="font-bold text-sm text-primary uppercase tracking-wide mb-6">Order Status</h2>
             <div className="flex items-start gap-0 overflow-x-auto">
               {TIMELINE.map((step, idx) => (
                 <div key={step.label} className="flex items-center flex-1 min-w-[120px]">
                   <div className="flex flex-col items-center flex-1">
-                    <div className={`w-8 h-8 rounded-full flex items-center justify-center text-xs font-bold shrink-0 ${
-                      idx === 0 ? "bg-primary text-white" : "bg-gray-100 text-gray-400"
-                    }`}>
-                      {idx === 0 ? "✓" : idx + 1}
+                    <div className={`w-8 h-8 rounded-full flex items-center justify-center text-xs font-bold shrink-0 ${idx <= doneIndex ? "bg-primary text-white" : "bg-gray-100 text-gray-400"}`}>
+                      {idx <= doneIndex ? "✓" : idx + 1}
                     </div>
-                    <p className={`mt-2 text-xs font-semibold text-center ${idx === 0 ? "text-primary" : "text-gray-400"}`}>
-                      {step.label}
-                    </p>
+                    <p className={`mt-2 text-xs font-semibold text-center ${idx <= doneIndex ? "text-primary" : "text-gray-400"}`}>{step.label}</p>
                     <p className="text-[11px] text-muted text-center mt-0.5 hidden sm:block">{step.sub}</p>
                   </div>
-                  {idx < TIMELINE.length - 1 && (
-                    <div className={`h-0.5 flex-1 mx-1 mb-6 ${idx === 0 ? "bg-primary" : "bg-gray-200"}`} />
-                  )}
+                  {idx < TIMELINE.length - 1 && <div className={`h-0.5 flex-1 mx-1 mb-6 ${idx < doneIndex ? "bg-primary" : "bg-gray-200"}`} />}
                 </div>
               ))}
             </div>
           </div>
 
-          {/* ── ADDRESS + ORDER SUMMARY ───────────────────── */}
+          {/* Address + summary */}
           <div className="grid lg:grid-cols-2 gap-5">
-
-            {/* Shipping Address */}
             <div className="bg-white rounded-lg shadow-sm p-5">
               <h2 className="font-bold text-sm text-primary uppercase tracking-wide mb-3">Shipping Address</h2>
-              <p className="text-sm font-semibold text-primary">{address.fullName}</p>
-              <p className="text-sm text-muted mt-0.5">{address.addressLine1}</p>
-              {address.addressLine2 && <p className="text-sm text-muted">{address.addressLine2}</p>}
-              {address.landmark && <p className="text-sm text-muted">{address.landmark}</p>}
+              <p className="text-sm text-muted">{address.line1}{address.line2 ? `, ${address.line2}` : ""}</p>
               <p className="text-sm text-muted">{address.city}, {address.state} — {address.pincode}</p>
-              <p className="text-sm text-muted mt-0.5">📞 {address.phone}</p>
               <div className="mt-4 pt-4 border-t border-gray-100">
                 <p className="text-xs text-gray-400 font-semibold uppercase tracking-wide">Estimated Delivery</p>
                 <p className="text-sm font-semibold text-primary mt-0.5">{deliveryEstimate()}</p>
               </div>
             </div>
 
-            {/* Order Summary */}
             <div className="bg-[#0F1E25] text-white p-5 rounded-lg shadow-md">
               <h2 className="font-bold text-base tracking-wide uppercase border-b border-white/10 pb-3">Order Summary</h2>
-
-              {/* Items */}
               <div className="mt-3 space-y-2.5 max-h-40 overflow-y-auto pr-1">
-                {items.map((item) => (
-                  <div key={item.id} className="flex items-center gap-2.5">
-                    <div className="w-8 h-8 shrink-0 bg-white/10 rounded flex items-center justify-center">
-                      <Image src={item.image} alt={item.name} width={28} height={28} className="object-contain" />
+                {order.items.map((item, i) => (
+                  <div key={i} className="flex items-center gap-2.5">
+                    <div className="w-8 h-8 shrink-0 bg-white/10 rounded flex items-center justify-center overflow-hidden">
+                      {item.image && <Image src={item.image} alt={item.name} width={28} height={28} className="object-contain" />}
                     </div>
                     <p className="flex-1 min-w-0 text-xs text-gray-300 truncate">{item.name}</p>
-                    <p className="text-xs text-gray-300 shrink-0">×{item.quantity}</p>
-                    <p className="text-xs font-semibold text-white shrink-0 whitespace-nowrap">{formatPrice(item.price * item.quantity)}</p>
+                    <p className="text-xs text-gray-300 shrink-0">×{item.qty}</p>
+                    <p className="text-xs font-semibold text-white shrink-0 whitespace-nowrap">{formatPrice(item.price * item.qty)}</p>
                   </div>
                 ))}
               </div>
-
-              {/* Totals */}
               <div className="mt-3 pt-3 border-t border-white/10 space-y-2 text-sm">
-                <div className="flex justify-between items-center">
-                  <span className="text-gray-400">Subtotal</span>
-                  <span className="font-medium">{formatPrice(subtotal)}</span>
-                </div>
-                <div className="flex justify-between items-center">
-                  <span className="text-gray-400">Discount (10%)</span>
-                  <span className="text-green-400 font-medium">−{formatPrice(discount)}</span>
-                </div>
-                <div className="flex justify-between items-center">
-                  <span className="text-gray-400">Delivery</span>
-                  <span className="font-medium">
-                    {delivery === 0 ? <span className="text-green-400">Free</span> : formatPrice(delivery)}
-                  </span>
-                </div>
+                <div className="flex justify-between"><span className="text-gray-400">Subtotal</span><span className="font-medium">{formatPrice(order.subtotal)}</span></div>
+                {order.gst > 0 && <div className="flex justify-between"><span className="text-gray-400">GST</span><span className="font-medium">{formatPrice(order.gst)}</span></div>}
+                {order.discount > 0 && <div className="flex justify-between"><span className="text-gray-400">Discount</span><span className="text-green-400 font-medium">−{formatPrice(order.discount)}</span></div>}
                 <div className="border-t border-white/10 pt-2.5 flex justify-between items-center font-bold text-base">
                   <span>Total Paid</span>
-                  <span className="text-accent text-lg">{formatPrice(total)}</span>
+                  <span className="text-accent text-lg">{formatPrice(order.total)}</span>
                 </div>
               </div>
-
-              {/* Payment method */}
-              <p className="mt-3 text-xs text-gray-500">
-                Paid via <span className="text-gray-300 font-medium">{paymentLabel(payment)}</span>
-              </p>
+              <p className="mt-3 text-xs text-gray-500">Paid via <span className="text-gray-300 font-medium">{order.payment.method} · {order.payment.label}</span></p>
             </div>
           </div>
 
-          {/* ── SUPPORT BANNER ───────────────────────────── */}
-          <div className="bg-primary text-white rounded-lg p-5 flex flex-col sm:flex-row items-center justify-between gap-4">
-            <div>
-              <p className="font-bold text-sm">Need help with your order?</p>
-              <p className="text-xs text-gray-300 mt-0.5">Our support team is available Mon–Sat, 9am–6pm.</p>
-            </div>
-            <div className="flex gap-3 shrink-0">
-              <button className="text-xs font-semibold border border-white/30 text-white px-4 py-2 rounded hover:bg-white/10 cursor-pointer transition-colors">
-                Contact Support
-              </button>
-              <button className="text-xs font-semibold bg-accent text-primary px-4 py-2 rounded hover:opacity-80 cursor-pointer transition-colors">
-                View FAQs
-              </button>
-            </div>
-          </div>
-
-          {/* ── FEATURES ROW ─────────────────────────────── */}
+          {/* Features */}
           <div className="grid sm:grid-cols-3 gap-4">
             {FEATURES.map((f) => (
               <div key={f.title} className="bg-white rounded-lg shadow-sm p-4 flex items-start gap-3">
@@ -212,24 +167,17 @@ export default function OrderSuccessPage() {
             ))}
           </div>
 
-          {/* ── YOU MAY ALSO LIKE ─────────────────────────── */}
-          <div>
-            <div className="flex items-center justify-between mb-4">
-              <h2 className="text-lg font-extrabold text-primary">You may also like</h2>
-              <Link href="/products" className="text-sm font-bold text-accent hover:underline">
-                View all →
-              </Link>
-            </div>
-            <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-4">
-              {recommended.map((product) => (
-                <ProductCard key={product.id} product={product} />
-              ))}
-            </div>
-          </div>
-
         </div>
       </main>
       <Footer />
     </>
+  );
+}
+
+export default function OrderSuccessPage() {
+  return (
+    <Suspense fallback={<div className="min-h-screen bg-[#F5F7FA]" />}>
+      <SuccessContent />
+    </Suspense>
   );
 }
