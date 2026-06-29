@@ -6,7 +6,7 @@ import { useRouter, useSearchParams } from "next/navigation";
 import {
   User, MapPin, ShoppingBag, Heart, CreditCard, Settings,
   LogOut, ChevronRight, Plus, Edit2, Trash2, Shield,
-  Package, CheckCircle, Clock, Truck, Home, Bell, Lock,
+  Package, CheckCircle, Clock, Truck, Home, Bell,
   Phone, Mail, Camera, X, Loader2, Building2, ArrowRight,
   Star, Tag, BookOpen, Wrench, AlertCircle, CheckCircle2,
   XCircle, Calendar,
@@ -14,7 +14,12 @@ import {
 import Footer from "@/components/layout/Footer";
 import { useWishlist } from "@/context/WishlistContext";
 import { useCart } from "@/context/CartContext";
-import { MOCK_ORDERS, STATUS_CONFIG } from "@/lib/ordersData";
+import { STATUS_CONFIG } from "@/lib/ordersData";
+import { getProfile, updateProfile } from "@/lib/api/auth";
+import { getOrders } from "@/lib/api/orders";
+import {
+  listAddresses, createAddress, updateAddress, deleteAddress, setDefaultAddress,
+} from "@/lib/api/addresses";
 import { Suspense } from "react";
 
 // ─── Constants ─────────────────────────────────────────────────────────────────
@@ -27,78 +32,32 @@ const MOCK_USER = {
   memberSince: "Jan 2024",
 };
 
-const MOCK_ADDRESSES = [
-  {
-    id: 1, label: "Home", name: "Ravi Kumar",
-    line1: "204, Sunflower Apartments", line2: "Andheri West, Mumbai",
-    city: "Mumbai", state: "Maharashtra", pincode: "400058",
-    phone: "+91 98765 43210", isDefault: true,
-  },
-  {
-    id: 2, label: "Office", name: "Ravi Kumar",
-    line1: "Block C, Tech Park", line2: "Powai",
-    city: "Mumbai", state: "Maharashtra", pincode: "400076",
-    phone: "+91 98765 43210", isDefault: false,
-  },
-];
-
-// ─── LocalStorage helpers ───────────────────────────────────────────────────────
-
-function loadUser() {
-  try {
-    const profile = localStorage.getItem("bb_user_profile");
-    if (profile) return { ...MOCK_USER, ...JSON.parse(profile) };
-    const pending = localStorage.getItem("bb_signup_pending");
-    if (pending) return { ...MOCK_USER, ...JSON.parse(pending) };
-  } catch {}
-  return MOCK_USER;
-}
-
-function saveUser(data) {
-  try { localStorage.setItem("bb_user_profile", JSON.stringify(data)); } catch {}
-}
-
-function loadAddresses() {
-  try {
-    const stored = localStorage.getItem("bb_addresses");
-    if (stored) return JSON.parse(stored);
-  } catch {}
-  return MOCK_ADDRESSES;
-}
-
-function persistAddresses(list) {
-  try { localStorage.setItem("bb_addresses", JSON.stringify(list)); } catch {}
-}
-
-function getUnreadCount() {
-  try {
-    const stored = localStorage.getItem("bb_notifications");
-    if (stored) {
-      const notifs = JSON.parse(stored);
-      return notifs.filter((n) => !n.read).length;
-    }
-  } catch {}
-  return 5; // default unread from seed data
+// Map the backend user ({ fullName, email, phoneNumber, createdAt, ... }) to the
+// shape this page renders ({ name, email, phone, avatar, memberSince }).
+function mapApiUser(api) {
+  if (!api) return MOCK_USER;
+  return {
+    name: api.fullName || "",
+    email: api.email || "",
+    phone: api.phoneNumber || "",
+    avatar: api.avatarUrl || null,
+    memberSince: api.createdAt
+      ? new Date(api.createdAt).toLocaleDateString("en-IN", { month: "short", year: "numeric" })
+      : "",
+  };
 }
 
 // ─── Address Modal ──────────────────────────────────────────────────────────────
 
 const LABEL_OPTIONS = ["Home", "Office", "Other"];
-const STATES = [
-  "Andhra Pradesh","Assam","Bihar","Chhattisgarh","Delhi","Goa","Gujarat",
-  "Haryana","Himachal Pradesh","Jharkhand","Karnataka","Kerala","Madhya Pradesh",
-  "Maharashtra","Manipur","Meghalaya","Mizoram","Nagaland","Odisha","Punjab",
-  "Rajasthan","Sikkim","Tamil Nadu","Telangana","Tripura","Uttar Pradesh",
-  "Uttarakhand","West Bengal",
-];
 
 function AddressModal({ address, onClose, onSave }) {
   const blank = {
-    label: "Home", name: "", line1: "", line2: "",
-    city: "", state: "", pincode: "", phone: "", isDefault: false,
+    label: "Home", line1: "", line2: "", pincode: "", isDefault: false,
   };
   const [form, setForm] = useState(address ? { ...address } : blank);
   const [saving, setSaving] = useState(false);
+  const [error, setError] = useState("");
 
   function field(key) {
     return (e) => setForm((p) => ({ ...p, [key]: e.target.value }));
@@ -107,10 +66,15 @@ function AddressModal({ address, onClose, onSave }) {
   async function handleSubmit(e) {
     e.preventDefault();
     setSaving(true);
-    await new Promise((r) => setTimeout(r, 400));
-    onSave(form);
-    setSaving(false);
-    onClose();
+    setError("");
+    try {
+      await onSave(form);
+      onClose();
+    } catch (err) {
+      setError(err?.message || "Could not save address. Please try again.");
+    } finally {
+      setSaving(false);
+    }
   }
 
   const inputCls = "w-full border border-gray-200 rounded-lg px-3 py-2.5 text-sm text-primary placeholder:text-muted focus:outline-none focus:border-accent focus:ring-1 focus:ring-accent/30 transition-all";
@@ -147,16 +111,6 @@ function AddressModal({ address, onClose, onSave }) {
               ))}
             </div>
           </div>
-          <div className="grid grid-cols-2 gap-3">
-            <div>
-              <label className="text-xs font-semibold text-muted uppercase tracking-wider mb-1.5 block">Full Name</label>
-              <input value={form.name} onChange={field("name")} required placeholder="Full Name" className={inputCls} />
-            </div>
-            <div>
-              <label className="text-xs font-semibold text-muted uppercase tracking-wider mb-1.5 block">Phone</label>
-              <input value={form.phone} onChange={field("phone")} required placeholder="+91 98765 43210" className={inputCls} />
-            </div>
-          </div>
           <div>
             <label className="text-xs font-semibold text-muted uppercase tracking-wider mb-1.5 block">Flat / House / Building</label>
             <input value={form.line1} onChange={field("line1")} required placeholder="Flat no, Building name" className={inputCls} />
@@ -165,22 +119,10 @@ function AddressModal({ address, onClose, onSave }) {
             <label className="text-xs font-semibold text-muted uppercase tracking-wider mb-1.5 block">Area / Street</label>
             <input value={form.line2} onChange={field("line2")} placeholder="Street, Area, Locality" className={inputCls} />
           </div>
-          <div className="grid grid-cols-3 gap-3">
-            <div className="col-span-1">
-              <label className="text-xs font-semibold text-muted uppercase tracking-wider mb-1.5 block">Pincode</label>
-              <input value={form.pincode} onChange={field("pincode")} required placeholder="400058" maxLength={6} pattern="\d{6}" className={inputCls} />
-            </div>
-            <div className="col-span-2">
-              <label className="text-xs font-semibold text-muted uppercase tracking-wider mb-1.5 block">City</label>
-              <input value={form.city} onChange={field("city")} required placeholder="Mumbai" className={inputCls} />
-            </div>
-          </div>
           <div>
-            <label className="text-xs font-semibold text-muted uppercase tracking-wider mb-1.5 block">State</label>
-            <select value={form.state} onChange={field("state")} required className={inputCls}>
-              <option value="">Select State</option>
-              {STATES.map((s) => <option key={s} value={s}>{s}</option>)}
-            </select>
+            <label className="text-xs font-semibold text-muted uppercase tracking-wider mb-1.5 block">Pincode</label>
+            <input value={form.pincode} onChange={field("pincode")} required placeholder="201301" maxLength={6} pattern="\d{6}" className={inputCls} />
+            <p className="text-[11px] text-muted mt-1.5">City &amp; state are detected automatically from your pincode.</p>
           </div>
           <label className="flex items-center gap-3 cursor-pointer group">
             <div
@@ -193,6 +135,9 @@ function AddressModal({ address, onClose, onSave }) {
             </div>
             <span className="text-sm font-medium text-primary">Set as default address</span>
           </label>
+          {error && (
+            <p className="text-xs font-medium text-red-500 bg-red-50 rounded-lg px-3 py-2">{error}</p>
+          )}
           <div className="flex gap-3 pt-2">
             <button type="button" onClick={onClose} className="flex-1 py-2.5 rounded-xl border border-gray-200 text-sm font-semibold text-primary hover:bg-gray-50 transition-colors cursor-pointer">
               Cancel
@@ -236,60 +181,79 @@ const ORDER_STATUS_ICONS = {
   "Cancelled":        XCircle,
 };
 
-function OrdersSection() {
-  const recent = MOCK_ORDERS.slice(0, 3);
+function OrdersSection({ orders, loading }) {
+  const recent = orders.slice(0, 3);
 
   return (
     <SectionWrapper
       title="My Orders"
-      subtitle={`${MOCK_ORDERS.length} orders placed`}
+      subtitle={loading ? "Loading…" : `${orders.length} order${orders.length === 1 ? "" : "s"} placed`}
       action={
         <Link href="/orders" className="flex items-center gap-1 text-xs font-semibold text-accent hover:text-accent/80 transition-colors cursor-pointer">
           View All <ArrowRight className="h-3.5 w-3.5" />
         </Link>
       }
     >
-      <div className="space-y-3">
-        {recent.map((order) => {
-          const cfg = STATUS_CONFIG[order.status] ?? STATUS_CONFIG["Placed"];
-          const StatusIcon = ORDER_STATUS_ICONS[order.status] ?? Package;
-          return (
-            <Link
-              key={order.id}
-              href={`/orders/${order.id}`}
-              className="flex items-center gap-4 p-4 rounded-xl border border-gray-100 hover:border-gray-200 hover:shadow-sm transition-all duration-200 cursor-pointer group"
-            >
-              <div className={`h-10 w-10 rounded-xl flex items-center justify-center flex-shrink-0 ${cfg.bg}`}>
-                <StatusIcon className={`h-4.5 w-4.5 ${cfg.color}`} style={{ width: 18, height: 18 }} />
-              </div>
-              <div className="flex-1 min-w-0">
-                <div className="flex flex-wrap items-center gap-2 mb-0.5">
-                  <span className="text-xs font-bold text-primary font-mono">{order.id}</span>
-                  <span className={`inline-flex items-center gap-1 text-[10px] font-semibold px-2 py-0.5 rounded-full ${cfg.bg} ${cfg.color}`}>
-                    <span className={`h-1.5 w-1.5 rounded-full ${cfg.dot}`} />
-                    {order.status}
-                  </span>
-                </div>
-                <p className="text-xs text-muted truncate">{order.items.map((i) => i.name).join(", ")}</p>
-              </div>
-              <div className="flex items-center gap-2 flex-shrink-0">
-                <span className="text-sm font-bold text-primary">₹{order.total.toLocaleString("en-IN")}</span>
-                <ChevronRight className="h-4 w-4 text-gray-400 group-hover:text-primary transition-colors" />
-              </div>
-            </Link>
-          );
-        })}
-      </div>
+      {loading ? (
+        <div className="flex items-center justify-center gap-2 py-10 text-sm text-muted">
+          <Loader2 className="h-4 w-4 animate-spin" /> Loading orders…
+        </div>
+      ) : orders.length === 0 ? (
+        <div className="flex flex-col items-center py-10 text-center">
+          <ShoppingBag className="h-8 w-8 text-gray-300 mb-3" />
+          <p className="text-sm font-semibold text-primary mb-1">No orders yet</p>
+          <p className="text-xs text-muted mb-4">Your placed orders will show up here.</p>
+          <Link href="/products" className="text-xs font-semibold text-accent hover:text-accent/80 transition-colors">
+            Start shopping →
+          </Link>
+        </div>
+      ) : (
+        <>
+          <div className="space-y-3">
+            {recent.map((order) => {
+              const cfg = STATUS_CONFIG[order.status] ?? STATUS_CONFIG["Placed"];
+              const StatusIcon = ORDER_STATUS_ICONS[order.status] ?? Package;
+              return (
+                <Link
+                  key={order.id}
+                  href={`/orders/${order.id}`}
+                  className="flex items-center gap-4 p-4 rounded-xl border border-gray-100 hover:border-gray-200 hover:shadow-sm transition-all duration-200 cursor-pointer group"
+                >
+                  <div className={`h-10 w-10 rounded-xl flex items-center justify-center flex-shrink-0 ${cfg.bg}`}>
+                    <StatusIcon className={`h-4.5 w-4.5 ${cfg.color}`} style={{ width: 18, height: 18 }} />
+                  </div>
+                  <div className="flex-1 min-w-0">
+                    <div className="flex flex-wrap items-center gap-2 mb-0.5">
+                      <span className="text-xs font-bold text-primary font-mono">{order.orderNumber ?? order.id}</span>
+                      <span className={`inline-flex items-center gap-1 text-[10px] font-semibold px-2 py-0.5 rounded-full ${cfg.bg} ${cfg.color}`}>
+                        <span className={`h-1.5 w-1.5 rounded-full ${cfg.dot}`} />
+                        {order.status}
+                      </span>
+                    </div>
+                    <p className="text-xs text-muted truncate">
+                      {order.itemCount} item{order.itemCount === 1 ? "" : "s"}{order.date ? ` · ${order.date}` : ""}
+                    </p>
+                  </div>
+                  <div className="flex items-center gap-2 flex-shrink-0">
+                    <span className="text-sm font-bold text-primary">₹{order.total.toLocaleString("en-IN")}</span>
+                    <ChevronRight className="h-4 w-4 text-gray-400 group-hover:text-primary transition-colors" />
+                  </div>
+                </Link>
+              );
+            })}
+          </div>
 
-      <div className="mt-4 pt-4 border-t border-gray-100">
-        <Link
-          href="/orders"
-          className="flex items-center justify-center gap-2 w-full py-2.5 rounded-xl border border-gray-200 text-sm font-semibold text-primary hover:border-primary hover:bg-gray-50 transition-all"
-        >
-          <ShoppingBag className="h-4 w-4" />
-          View All Orders
-        </Link>
-      </div>
+          <div className="mt-4 pt-4 border-t border-gray-100">
+            <Link
+              href="/orders"
+              className="flex items-center justify-center gap-2 w-full py-2.5 rounded-xl border border-gray-200 text-sm font-semibold text-primary hover:border-primary hover:bg-gray-50 transition-all"
+            >
+              <ShoppingBag className="h-4 w-4" />
+              View All Orders
+            </Link>
+          </div>
+        </>
+      )}
     </SectionWrapper>
   );
 }
@@ -379,34 +343,39 @@ function WishlistSection() {
 
 function AddressesSection() {
   const [addresses, setAddresses] = useState([]);
+  const [loading, setLoading] = useState(true);
   const [modal, setModal] = useState(null);
 
-  useEffect(() => { setAddresses(loadAddresses()); }, []);
-
-  const save = useCallback((list) => {
+  const refresh = useCallback(async () => {
+    const list = await listAddresses();
     setAddresses(list);
-    persistAddresses(list);
+    return list;
   }, []);
 
-  function handleSave(form) {
-    let updated = form.isDefault ? addresses.map((a) => ({ ...a, isDefault: false })) : [...addresses];
-    if (!form.id) {
-      updated = [...updated, { ...form, id: Date.now() }];
-    } else {
-      updated = updated.map((a) => (a.id === form.id ? form : a));
-    }
-    if (!updated.some((a) => a.isDefault) && updated.length > 0) {
-      updated[0] = { ...updated[0], isDefault: true };
-    }
-    save(updated);
+  useEffect(() => {
+    let active = true;
+    listAddresses()
+      .then((list) => { if (active) setAddresses(list); })
+      .catch(() => {})
+      .finally(() => { if (active) setLoading(false); });
+    return () => { active = false; };
+  }, []);
+
+  // Throws on failure so the modal can surface the error (e.g. unserviceable pincode).
+  async function handleSave(form) {
+    if (form.id) await updateAddress(form.id, form);
+    else await createAddress(form);
+    await refresh();
   }
 
-  function handleDelete(id) {
-    const updated = addresses.filter((a) => a.id !== id);
-    if (!updated.some((a) => a.isDefault) && updated.length > 0) {
-      updated[0] = { ...updated[0], isDefault: true };
-    }
-    save(updated);
+  async function handleDelete(id) {
+    await deleteAddress(id);
+    await refresh();
+  }
+
+  async function handleSetDefault(id) {
+    await setDefaultAddress(id);
+    await refresh();
   }
 
   return (
@@ -427,54 +396,58 @@ function AddressesSection() {
           </button>
         }
       >
-        <div className="grid sm:grid-cols-2 gap-4">
-          {addresses.map((addr) => (
-            <div
-              key={addr.id}
-              className="relative p-4 rounded-xl border-2 hover:shadow-md transition-all duration-200"
-              style={{ borderColor: addr.isDefault ? "#F0C12D" : "#f3f4f6" }}
-            >
-              {addr.isDefault && (
-                <span className="absolute top-3 right-3 text-[10px] font-bold bg-accent text-primary px-2 py-0.5 rounded-full">Default</span>
-              )}
-              <div className="flex items-center gap-2 mb-3">
-                <div className="h-7 w-7 rounded-lg bg-primary/10 flex items-center justify-center">
-                  {addr.label === "Home" ? <Home className="h-3.5 w-3.5 text-primary" /> : addr.label === "Office" ? <Building2 className="h-3.5 w-3.5 text-primary" /> : <MapPin className="h-3.5 w-3.5 text-primary" />}
-                </div>
-                <span className="text-sm font-bold text-primary">{addr.label}</span>
-              </div>
-              <p className="text-sm text-gray-700 font-medium">{addr.name}</p>
-              <p className="text-xs text-muted mt-1">{addr.line1}</p>
-              {addr.line2 && <p className="text-xs text-muted">{addr.line2}</p>}
-              <p className="text-xs text-muted">{addr.city}, {addr.state} — {addr.pincode}</p>
-              <p className="text-xs text-muted mt-1">{addr.phone}</p>
-              <div className="flex items-center gap-3 mt-4 pt-3 border-t border-gray-100">
-                <button onClick={() => setModal(addr)} className="flex items-center gap-1 text-xs font-medium text-primary hover:text-accent transition-colors cursor-pointer">
-                  <Edit2 className="h-3 w-3" /> Edit
-                </button>
-                {!addr.isDefault && (
-                  <>
-                    <button onClick={() => handleDelete(addr.id)} className="flex items-center gap-1 text-xs font-medium text-muted hover:text-red-500 transition-colors cursor-pointer">
-                      <Trash2 className="h-3 w-3" /> Remove
-                    </button>
-                    <button onClick={() => save(addresses.map((a) => ({ ...a, isDefault: a.id === addr.id })))} className="ml-auto text-xs font-medium text-accent hover:text-accent/80 transition-colors cursor-pointer">
-                      Set Default
-                    </button>
-                  </>
+        {loading ? (
+          <div className="flex items-center justify-center gap-2 py-12 text-sm text-muted">
+            <Loader2 className="h-4 w-4 animate-spin" /> Loading addresses…
+          </div>
+        ) : (
+          <div className="grid sm:grid-cols-2 gap-4">
+            {addresses.map((addr) => (
+              <div
+                key={addr.id}
+                className="relative p-4 rounded-xl border-2 hover:shadow-md transition-all duration-200"
+                style={{ borderColor: addr.isDefault ? "#F0C12D" : "#f3f4f6" }}
+              >
+                {addr.isDefault && (
+                  <span className="absolute top-3 right-3 text-[10px] font-bold bg-accent text-primary px-2 py-0.5 rounded-full">Default</span>
                 )}
+                <div className="flex items-center gap-2 mb-3">
+                  <div className="h-7 w-7 rounded-lg bg-primary/10 flex items-center justify-center">
+                    {addr.label === "Home" ? <Home className="h-3.5 w-3.5 text-primary" /> : addr.label === "Office" ? <Building2 className="h-3.5 w-3.5 text-primary" /> : <MapPin className="h-3.5 w-3.5 text-primary" />}
+                  </div>
+                  <span className="text-sm font-bold text-primary">{addr.label}</span>
+                </div>
+                <p className="text-sm text-gray-700 font-medium">{addr.line1}</p>
+                {addr.line2 && <p className="text-xs text-muted mt-0.5">{addr.line2}</p>}
+                <p className="text-xs text-muted mt-0.5">{addr.city}, {addr.state} — {addr.pincode}</p>
+                <div className="flex items-center gap-3 mt-4 pt-3 border-t border-gray-100">
+                  <button onClick={() => setModal(addr)} className="flex items-center gap-1 text-xs font-medium text-primary hover:text-accent transition-colors cursor-pointer">
+                    <Edit2 className="h-3 w-3" /> Edit
+                  </button>
+                  {!addr.isDefault && (
+                    <>
+                      <button onClick={() => handleDelete(addr.id)} className="flex items-center gap-1 text-xs font-medium text-muted hover:text-red-500 transition-colors cursor-pointer">
+                        <Trash2 className="h-3 w-3" /> Remove
+                      </button>
+                      <button onClick={() => handleSetDefault(addr.id)} className="ml-auto text-xs font-medium text-accent hover:text-accent/80 transition-colors cursor-pointer">
+                        Set Default
+                      </button>
+                    </>
+                  )}
+                </div>
               </div>
-            </div>
-          ))}
-          <button
-            onClick={() => setModal("add")}
-            className="flex flex-col items-center justify-center gap-2 p-4 rounded-xl border-2 border-dashed border-gray-200 hover:border-accent hover:bg-accent/5 transition-all duration-200 cursor-pointer group min-h-[160px]"
-          >
-            <div className="h-10 w-10 rounded-full bg-gray-100 group-hover:bg-accent/10 flex items-center justify-center transition-colors">
-              <Plus className="h-5 w-5 text-gray-400 group-hover:text-accent transition-colors" />
-            </div>
-            <span className="text-sm font-semibold text-gray-500 group-hover:text-primary transition-colors">Add New Address</span>
-          </button>
-        </div>
+            ))}
+            <button
+              onClick={() => setModal("add")}
+              className="flex flex-col items-center justify-center gap-2 p-4 rounded-xl border-2 border-dashed border-gray-200 hover:border-accent hover:bg-accent/5 transition-all duration-200 cursor-pointer group min-h-[160px]"
+            >
+              <div className="h-10 w-10 rounded-full bg-gray-100 group-hover:bg-accent/10 flex items-center justify-center transition-colors">
+                <Plus className="h-5 w-5 text-gray-400 group-hover:text-accent transition-colors" />
+              </div>
+              <span className="text-sm font-semibold text-gray-500 group-hover:text-primary transition-colors">Add New Address</span>
+            </button>
+          </div>
+        )}
       </SectionWrapper>
     </>
   );
@@ -492,25 +465,9 @@ const NOTIF_TYPE_CONFIG = {
 };
 
 function NotificationsSection() {
-  const [notifs, setNotifs] = useState([]);
-
-  useEffect(() => {
-    try {
-      const stored = localStorage.getItem("bb_notifications");
-      if (stored) setNotifs(JSON.parse(stored));
-      else {
-        // Use first 5 seeds from notifications page
-        const seeds = [
-          { id: 1, type: "order",   read: false, title: "Order Delivered!", message: "BB-20240312-1892 delivered successfully.", time: "2 hours ago", href: "/orders/BB-20240312-1892" },
-          { id: 2, type: "offer",   read: false, title: "Flash Sale: Power Tools — 40% Off", message: "Bosch, Makita, Stanley. Limited stock.", time: "3 hours ago", href: "/products" },
-          { id: 3, type: "service", read: false, title: "Service Booking Confirmed", message: "Plumbing service confirmed for tomorrow 10 AM.", time: "5 hours ago", href: "/services" },
-          { id: 4, type: "order",   read: false, title: "Order Shipped", message: "BB-20240228-0741 is on its way.", time: "1 day ago", href: "/orders/BB-20240228-0741" },
-          { id: 5, type: "diy",     read: false, title: "New DIY Guide Published", message: "Monsoon-Proofing Your Home — now live.", time: "1 day ago", href: "/diy" },
-        ];
-        setNotifs(seeds);
-      }
-    } catch {}
-  }, []);
+  // Notifications have no backend yet (deferred — MSG91/D4 on hold), so there is no
+  // live data to show. Render the honest empty state instead of mock seeds.
+  const [notifs] = useState([]);
 
   const recent = notifs.slice(0, 5);
   const unread = notifs.filter((n) => !n.read).length;
@@ -596,20 +553,32 @@ function PaymentsSection() {
 // ─── Settings section ───────────────────────────────────────────────────────────
 
 function SettingsSection() {
-  const [user, setUser] = useState(MOCK_USER);
+  const [user, setUser] = useState({ name: "", email: "", phone: "", avatar: null, memberSince: "" });
   const [saved, setSaved] = useState(false);
   const [saving, setSaving] = useState(false);
+  const [error, setError] = useState("");
   const [notifications, setNotifications] = useState({ email: true, sms: true, push: false });
 
-  useEffect(() => { setUser(loadUser()); }, []);
+  useEffect(() => {
+    getProfile().then((u) => setUser(mapApiUser(u))).catch(() => {});
+  }, []);
 
   async function handleSave() {
     setSaving(true);
-    await new Promise((r) => setTimeout(r, 600));
-    saveUser(user);
-    setSaving(false);
-    setSaved(true);
-    setTimeout(() => setSaved(false), 2500);
+    setError("");
+    try {
+      // Backend PATCH /users/me accepts fullName + email; phone is the login
+      // identity and is not editable here.
+      const updated = await updateProfile({ fullName: user.name, email: user.email });
+      setUser(mapApiUser(updated));
+      setSaved(true);
+      setTimeout(() => setSaved(false), 2500);
+    } catch (err) {
+      // e.g. 400 "This email is already in use"
+      setError(err?.message || "Could not save your changes. Please try again.");
+    } finally {
+      setSaving(false);
+    }
   }
 
   const inputCls = "w-full pl-9 pr-4 py-2.5 text-sm border border-gray-200 rounded-lg focus:outline-none focus:border-accent focus:ring-1 focus:ring-accent/30 transition-all";
@@ -636,10 +605,14 @@ function SettingsSection() {
             <label className="block text-xs font-semibold text-muted mb-1.5 uppercase tracking-wider">Phone Number</label>
             <div className="relative">
               <Phone className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-gray-400" />
-              <input value={user.phone} onChange={(e) => setUser((p) => ({ ...p, phone: e.target.value }))} className={inputCls} />
+              <input value={user.phone} readOnly disabled className={`${inputCls} bg-gray-50 text-muted cursor-not-allowed`} />
             </div>
+            <p className="text-[11px] text-muted mt-1">Phone number is your login ID and can&apos;t be changed.</p>
           </div>
         </div>
+        {error && (
+          <p className="mt-4 text-xs text-red-500 bg-red-50 border border-red-100 rounded-md px-3 py-2">{error}</p>
+        )}
         <div className="mt-5 flex items-center gap-3">
           <button onClick={handleSave} disabled={saving} className="px-5 py-2.5 bg-primary text-white text-sm font-semibold rounded-lg hover:bg-primary/90 transition-colors cursor-pointer disabled:opacity-60 flex items-center gap-2">
             {saving && <Loader2 className="h-3.5 w-3.5 animate-spin" />}
@@ -676,7 +649,6 @@ function SettingsSection() {
       <SectionWrapper title="Security" subtitle="Manage your password and account security">
         <div className="space-y-3">
           {[
-            { icon: Lock,   label: "Change Password",           sub: "Last changed 3 months ago",       href: "/auth/forgot-password" },
             { icon: Shield, label: "Two-Factor Authentication", sub: "Add an extra layer of security",  href: null },
           ].map(({ icon: Icon, label, sub, href }) => {
             const Wrapper = href ? Link : "button";
@@ -709,8 +681,9 @@ function ProfilePageInner() {
   const searchParams = useSearchParams();
   const initialSection = searchParams.get("section") ?? "orders";
   const [activeSection, setActiveSection] = useState(initialSection);
-  const [user, setUser] = useState(MOCK_USER);
-  const [unreadCount, setUnreadCount] = useState(5);
+  const [user, setUser] = useState({ name: "", email: "", phone: "", avatar: null, memberSince: "" });
+  const [orders, setOrders] = useState(null); // null = loading; shared by badge, stat, and OrdersSection
+  const [unreadCount] = useState(0); // notifications backend deferred — no unread to show yet
   const router = useRouter();
   const { wishlist } = useWishlist();
 
@@ -726,18 +699,22 @@ function ProfilePageInner() {
       router.replace("/auth/login");
       return;
     }
-    setUser(loadUser());
-    setUnreadCount(getUnreadCount());
+    getProfile()
+      .then((u) => setUser(mapApiUser(u)))
+      .catch(() => {});
+    getOrders()
+      .then((res) => setOrders(res.orders ?? []))
+      .catch(() => setOrders([]));
   }, [router]);
 
   const SIDEBAR_ITEMS = useMemo(() => [
-    { id: "orders",        label: "My Orders",       icon: ShoppingBag, badge: MOCK_ORDERS.length },
+    { id: "orders",        label: "My Orders",       icon: ShoppingBag, badge: orders && orders.length > 0 ? orders.length : null },
     { id: "addresses",     label: "Saved Addresses", icon: MapPin       },
     { id: "wishlist",      label: "Wishlist",         icon: Heart,       badge: wishlist.length > 0 ? wishlist.length : null },
     { id: "notifications", label: "Notifications",   icon: Bell,        badge: unreadCount > 0 ? unreadCount : null },
     { id: "payments",      label: "Saved Payments",  icon: CreditCard   },
     { id: "settings",      label: "Account Settings", icon: Settings    },
-  ], [wishlist.length, unreadCount]);
+  ], [orders, wishlist.length, unreadCount]);
 
   const handleLogout = () => {
     localStorage.removeItem("bb_logged_in");
@@ -747,7 +724,7 @@ function ProfilePageInner() {
 
   const renderSection = () => {
     switch (activeSection) {
-      case "orders":        return <OrdersSection />;
+      case "orders":        return <OrdersSection orders={orders ?? []} loading={orders === null} />;
       case "addresses":     return <AddressesSection />;
       case "wishlist":      return <WishlistSection />;
       case "notifications": return <NotificationsSection />;
@@ -757,7 +734,7 @@ function ProfilePageInner() {
     }
   };
 
-  const initials = user.name.split(" ").map((n) => n[0]).join("").slice(0, 2).toUpperCase();
+  const initials = (user.name || "").split(" ").map((n) => n[0]).filter(Boolean).join("").slice(0, 2).toUpperCase();
 
   return (
     <div className="flex min-h-screen flex-col bg-[#F5F6FA]">
@@ -804,7 +781,7 @@ function ProfilePageInner() {
             {/* Quick stats */}
             <div className="flex gap-5 flex-shrink-0">
               {[
-                { label: "Orders",   value: MOCK_ORDERS.length, section: "orders"    },
+                { label: "Orders",   value: orders?.length ?? 0, section: "orders"    },
                 { label: "Wishlist", value: wishlist.length,    section: "wishlist"  },
                 { label: "Alerts",   value: unreadCount,        section: "notifications" },
               ].map(({ label, value, section }) => (

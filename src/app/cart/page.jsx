@@ -1,7 +1,6 @@
 "use client";
 
-import { useState } from "react";
-import Image from "next/image";
+import { useState, useEffect } from "react";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
 import {
@@ -31,6 +30,13 @@ export default function CartPage() {
   const [couponInput, setCouponInput]     = useState("");
   const [appliedCoupon, setAppliedCoupon] = useState(null);
   const [couponError, setCouponError]     = useState("");
+
+  // Cart is for logged-in users only — bounce guests to login.
+  useEffect(() => {
+    if (typeof window !== "undefined" && !localStorage.getItem("bb_logged_in")) {
+      router.replace("/auth/login");
+    }
+  }, [router]);
 
   function applyCoupon() {
     const code = couponInput.toUpperCase().trim();
@@ -110,16 +116,21 @@ export default function CartPage() {
                   >
                     {/* Image */}
                     <Link
-                      href={`/products/${item.id}`}
+                      href={`/products/${item.slug || item.id}`}
                       className="w-[88px] h-[88px] shrink-0 bg-gray-50 border border-gray-100 rounded-xl flex items-center justify-center hover:border-gray-200 transition-colors"
                     >
-                      <Image
-                        src={item.image}
-                        alt={item.name}
-                        width={80}
-                        height={80}
-                        className="object-contain"
-                      />
+                      {item.image ? (
+                        // eslint-disable-next-line @next/next/no-img-element
+                        <img
+                          src={item.image}
+                          alt={item.name}
+                          width={80}
+                          height={80}
+                          className="object-contain"
+                        />
+                      ) : (
+                        <ShoppingCart className="h-8 w-8 text-gray-300" />
+                      )}
                     </Link>
 
                     {/* Info */}
