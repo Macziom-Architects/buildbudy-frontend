@@ -1,131 +1,116 @@
-import { USE_MOCK, MOCK_DELAY_MS, delay, apiPost, apiGet, apiPut, setToken, getToken } from "./client";
+import { USE_MOCK, MOCK_DELAY_MS, delay, apiPost, apiGet, apiPatch, setToken } from "./client";
 
 // ─── Mock user ─────────────────────────────────────────────────────────────────
 
 const BASE_USER = {
   id: "usr_001",
-  name: "Ravi Kumar",
+  fullName: "Ravi Kumar",
   email: "ravi.kumar@example.com",
-  phone: "+91 98765 43210",
-  memberSince: "Jan 2024",
-  verified: true,
-  avatar: null,
+  phoneNumber: "+91 98765 43210",
+  roles: ["customer"],
+  isVerified: true,
 };
 
 function readStoredUser() {
   try {
-    const raw = localStorage.getItem("bb_user_profile") ?? localStorage.getItem("bb_signup_pending");
+    const raw = localStorage.getItem("bb_user_profile");
     return raw ? { ...BASE_USER, ...JSON.parse(raw) } : BASE_USER;
   } catch {
     return BASE_USER;
   }
 }
 
-// ─── Auth API ──────────────────────────────────────────────────────────────────
-
-/**
- * Sign in with email + password.
- * Returns { token, user }.
- */
-export async function login({ email, password }) {
-  if (USE_MOCK) {
-    await delay(MOCK_DELAY_MS);
-    if (!email || !password || password.length < 6) {
-      const err = new Error("Invalid credentials");
-      err.status = 401;
-      throw err;
-    }
-    const token = `mock_${Date.now()}`;
-    localStorage.setItem("bb_logged_in", "1");
-    setToken(token);
-    window.dispatchEvent(new Event("storage"));
-    return { token, user: readStoredUser() };
-  }
-  const data = await apiPost("/auth/login", { email, password }, { token: null });
-  setToken(data.token);
-  return data;
-}
-
-/**
- * Register a new account.
- * Returns { token, user }.
- */
-export async function signup({ name, email, phone, password }) {
-  if (USE_MOCK) {
-    await delay(MOCK_DELAY_MS);
-    const token = `mock_${Date.now()}`;
-    const user = { ...BASE_USER, name, email, phone };
-    localStorage.setItem("bb_logged_in", "1");
-    localStorage.setItem("bb_user_profile", JSON.stringify({ name, email, phone }));
-    setToken(token);
-    window.dispatchEvent(new Event("storage"));
-    return { token, user };
-  }
-  const data = await apiPost("/auth/signup", { name, email, phone, password }, { token: null });
-  setToken(data.token);
-  return data;
-}
-
-/**
- * Send a password-reset email.
- */
-export async function requestPasswordReset(email) {
-  if (USE_MOCK) {
-    await delay(MOCK_DELAY_MS);
-    return { ok: true };
-  }
-  return apiPost("/auth/password/reset", { email }, { token: null });
-}
-
-/**
- * Sign out the current user.
- */
-export async function logout() {
-  if (USE_MOCK) {
-    localStorage.removeItem("bb_logged_in");
-    setToken(null);
-    window.dispatchEvent(new Event("storage"));
-    return;
-  }
+function markLoggedIn() {
   try {
-    await apiPost("/auth/logout", {});
-  } finally {
-    localStorage.removeItem("bb_logged_in");
-    setToken(null);
+    localStorage.setItem("bb_logged_in", "true");
     window.dispatchEvent(new Event("storage"));
+  } catch {}
+}
+
+// ─── Auth API (phone + OTP) ──────────────────────────────────────────────────────
+
+/**
+ * Request an OTP for a phone number.
+ * Backend: POST /auth/otp/request { phoneNumber }
+ * Returns { message, expiresInSeconds, otp? } — `otp` is only present for the
+ * configured test number / in development.
+ */
+export async function requestOtp(phoneNumber) {
+  if (USE_MOCK) {
+    await delay(MOCK_DELAY_MS);
+    return { message: "OTP sent", expiresInSeconds: 600, otp: "123456" };
   }
+  return apiPost("/auth/otp/request", { phoneNumber }, { token: null });
+}
+
+/**
+ * Verify an OTP and start a session.
+ * Backend: POST /auth/otp/verify { phoneNumber, otp }
+ * Returns { accessToken, user } where
+ *   user = { id, phoneNumber, fullName, roles[], isNewUser }
+ * Stores the JWT and flags the client as logged in.
+ */
+export async function verifyOtp(phoneNumber, otp) {
+  if (USE_MOCK) {
+    await delay(MOCK_DELAY_MS);
+    const token = `mock_${Date.now()}`;
+    setToken(token);
+    markLoggedIn();
+    return {
+      accessToken: token,
+      user: { ...BASE_USER, phoneNumber, isNewUser: false },
+    };
+  }
+  const data = await apiPost("/auth/otp/verify", { phoneNumber, otp }, { token: null });
+  setToken(data.accessToken);
+  markLoggedIn();
+  return data;
+}
+
+/**
+ * Sign out the current user. JWT is stateless — there is no server call;
+ * just clear the token and local flags.
+ */
+export function logout() {
+  try {
+    setToken(null);
+    localStorage.removeItem("bb_logged_in");
+    localStorage.removeItem("bb_user_profile");
+    window.dispatchEvent(new Event("storage"));
+  } catch {}
 }
 
 /**
  * Fetch the authenticated user's profile.
- * Returns a User object.
+ * Backend: GET /auth/me
+ * Returns { id, phoneNumber, fullName, email, roles[], isVerified, createdAt }.
  */
 export async function getProfile() {
   if (USE_MOCK) {
     await delay(MOCK_DELAY_MS);
     return readStoredUser();
   }
-  return apiGet("/auth/profile");
+  return apiGet("/auth/me");
 }
 
 /**
- * Update the authenticated user's profile.
- * Returns the updated User object.
+ * Update the authenticated user's profile (used by onboarding for name + email).
+ * Backend: PATCH /users/me { fullName?, email? }
+ * Throws ApiError(400) with "This email is already in use" on email conflict.
  */
 export async function updateProfile(patch) {
   if (USE_MOCK) {
     await delay(MOCK_DELAY_MS);
-    const current = readStoredUser();
-    const updated = { ...current, ...patch };
-    localStorage.setItem("bb_user_profile", JSON.stringify(patch));
+    const updated = { ...readStoredUser(), ...patch };
+    localStorage.setItem("bb_user_profile", JSON.stringify(updated));
     return updated;
   }
-  return apiPut("/auth/profile", patch);
+  return apiPatch("/users/me", patch);
 }
 
 /**
  * Return true if the user is currently authenticated.
- * Safe to call on server (always returns false).
+ * Safe to call on the server (always returns false).
  */
 export function isLoggedIn() {
   try {

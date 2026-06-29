@@ -65,7 +65,7 @@ export function setToken(token) {
  * @param {{ body?: unknown, params?: Record<string,string|number>, token?: string|null }} [opts]
  */
 async function request(method, path, { body, params, token } = {}) {
-  const url = new URL(`${BASE_URL}/api${path}`);
+  const url = new URL(`${BASE_URL}/api/v1${path}`);
   if (params) {
     Object.entries(params).forEach(([k, v]) => {
       if (v != null) url.searchParams.set(k, String(v));

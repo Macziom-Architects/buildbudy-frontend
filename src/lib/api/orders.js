@@ -1,6 +1,32 @@
 import { USE_MOCK, MOCK_DELAY_MS, delay, apiGet, apiPost, apiPut } from "./client";
 import { MOCK_ORDERS } from "@/lib/ordersData";
 
+// ─── API → UI shape mappers ──────────────────────────────────────────────────────
+// Backend `GET /orders` returns { items, page, limit, total } with money in paise and
+// a lowercase status enum; map it onto the title-case status + rupee fields the UI uses.
+
+const ORDER_STATUS_MAP = {
+  pending: "Placed",
+  confirmed: "Packed",
+  partially_delivered: "Shipped",
+  delivered: "Delivered",
+  cancelled: "Cancelled",
+};
+
+function mapApiOrder(raw) {
+  return {
+    id: raw.id,
+    orderNumber: raw.orderNumber,
+    status: ORDER_STATUS_MAP[raw.status] ?? "Placed",
+    total: (raw.totalPaise ?? 0) / 100,
+    itemCount: raw.itemCount ?? 0,
+    placedAt: raw.placedAt,
+    date: raw.placedAt
+      ? new Date(raw.placedAt).toLocaleDateString("en-IN", { day: "numeric", month: "short", year: "numeric" })
+      : "",
+  };
+}
+
 // ─── Orders API ────────────────────────────────────────────────────────────────
 
 /**
@@ -36,7 +62,9 @@ export async function getOrders(filters = {}) {
     return { orders, total: orders.length };
   }
 
-  return apiGet("/orders", filters);
+  const res = await apiGet("/orders", filters);
+  const orders = (res?.items ?? []).map(mapApiOrder);
+  return { orders, total: res?.total ?? orders.length };
 }
 
 /**
