@@ -1,7 +1,13 @@
 "use client";
 
 import { useState, useEffect, useCallback, useSyncExternalStore } from "react";
-import { login as apiLogin, signup as apiSignup, logout as apiLogout, getProfile, updateProfile as apiUpdateProfile } from "@/lib/api/auth";
+import {
+  requestOtp as apiRequestOtp,
+  verifyOtp as apiVerifyOtp,
+  logout as apiLogout,
+  getProfile,
+  updateProfile as apiUpdateProfile,
+} from "@/lib/api/auth";
 
 // ─── Reactive logged-in state ──────────────────────────────────────────────────
 
@@ -28,10 +34,10 @@ function getLoggedIn() {
  *   isLoggedIn  — boolean (reactive)
  *   user        — User object | null
  *   loading     — true while profile is being fetched
- *   login()     — async, throws on invalid credentials
- *   signup()    — async
- *   logout()    — async
- *   updateProfile() — async, updates user state
+ *   requestOtp(phoneNumber)      — async, asks backend to send an OTP
+ *   verifyOtp(phoneNumber, otp)  — async, starts a session; returns { accessToken, user }
+ *   logout()    — clears the session client-side
+ *   updateProfile() — async, updates user state (onboarding name + email)
  */
 export function useAuth() {
   const isLoggedIn = useSyncExternalStore(
@@ -45,21 +51,32 @@ export function useAuth() {
   const [error, setError]     = useState(null);
 
   useEffect(() => {
-    if (!isLoggedIn) {
-      setUser(null);
-      return;
-    }
+    if (!isLoggedIn) return; // logged-out user is derived as null in the return value
+    // eslint-disable-next-line react-hooks/set-state-in-effect -- loading flag for the profile fetch kicked off below
     setLoading(true);
     getProfile()
       .then((u) => { setUser(u); setLoading(false); })
       .catch(() => setLoading(false));
   }, [isLoggedIn]);
 
-  const login = useCallback(async (credentials) => {
+  const requestOtp = useCallback(async (phoneNumber) => {
     setLoading(true);
     setError(null);
     try {
-      const result = await apiLogin(credentials);
+      return await apiRequestOtp(phoneNumber);
+    } catch (err) {
+      setError(err);
+      throw err;
+    } finally {
+      setLoading(false);
+    }
+  }, []);
+
+  const verifyOtp = useCallback(async (phoneNumber, otp) => {
+    setLoading(true);
+    setError(null);
+    try {
+      const result = await apiVerifyOtp(phoneNumber, otp);
       setUser(result.user);
       return result;
     } catch (err) {
@@ -70,23 +87,8 @@ export function useAuth() {
     }
   }, []);
 
-  const signup = useCallback(async (data) => {
-    setLoading(true);
-    setError(null);
-    try {
-      const result = await apiSignup(data);
-      setUser(result.user);
-      return result;
-    } catch (err) {
-      setError(err);
-      throw err;
-    } finally {
-      setLoading(false);
-    }
-  }, []);
-
-  const logout = useCallback(async () => {
-    await apiLogout();
+  const logout = useCallback(() => {
+    apiLogout();
     setUser(null);
   }, []);
 
@@ -96,5 +98,5 @@ export function useAuth() {
     return updated;
   }, []);
 
-  return { isLoggedIn, user, loading, error, login, signup, logout, updateProfile };
+  return { isLoggedIn, user: isLoggedIn ? user : null, loading, error, requestOtp, verifyOtp, logout, updateProfile };
 }

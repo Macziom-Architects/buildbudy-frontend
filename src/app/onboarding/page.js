@@ -6,8 +6,9 @@ import {
   Hammer, Wrench, Briefcase, Search,
   Home, Package, Zap,
   CheckCircle2, XCircle,
-  MapPin, CheckCircle,
+  MapPin, CheckCircle, Loader2,
 } from "lucide-react";
+import { getProfile, updateProfile } from "@/lib/api/auth";
 
 const STEPS = [
   {
@@ -55,6 +56,8 @@ const STEPS = [
 
 const INITIAL = { project: null, needs: [], help: null, location: null };
 
+const EMAIL_RE = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
+
 export default function OnboardingPage() {
   const router = useRouter();
   const [step, setStep] = useState(1);
@@ -64,13 +67,121 @@ export default function OnboardingPage() {
   const [locating, setLocating] = useState(false);
   const [done, setDone] = useState(false);
 
- useEffect(() => {
-   const loggedIn = localStorage.getItem("bb_logged_in");
+  // ── Identity step (name + email, both required) ──────────────────────────────
+  const [identityDone, setIdentityDone] = useState(false);
+  const [fullName, setFullName] = useState("");
+  const [email, setEmail] = useState("");
+  const [savingIdentity, setSavingIdentity] = useState(false);
+  const [identityError, setIdentityError] = useState("");
+  const [checking, setChecking] = useState(true);
 
-   if (!loggedIn) {
-     router.replace("/auth/login");
-   }
- }, []);
+  // Gate the page on auth, then skip the identity step if the profile already
+  // has name + email (signup collects them, so those users go straight to the
+  // preferences quiz; a new user who came via login still gets asked here).
+  useEffect(() => {
+    if (!localStorage.getItem("bb_logged_in")) {
+      router.replace("/auth/login");
+      return;
+    }
+    getProfile()
+      .then((u) => {
+        if (u?.fullName) setFullName(u.fullName);
+        if (u?.email) setEmail(u.email);
+        if (u?.fullName && u?.email) setIdentityDone(true);
+      })
+      .catch(() => {})
+      .finally(() => setChecking(false));
+  }, [router]);
+
+  if (checking) {
+    return (
+      <main className="h-screen flex items-center justify-center bg-background">
+        <Loader2 className="h-6 w-6 animate-spin text-accent" />
+      </main>
+    );
+  }
+
+  async function handleSaveIdentity(e) {
+    e.preventDefault();
+    setIdentityError("");
+
+    const name = fullName.trim();
+    const mail = email.trim();
+    if (name.length < 2) {
+      setIdentityError("Please enter your full name.");
+      return;
+    }
+    if (!EMAIL_RE.test(mail)) {
+      setIdentityError("Please enter a valid email address.");
+      return;
+    }
+
+    setSavingIdentity(true);
+    try {
+      await updateProfile({ fullName: name, email: mail });
+      setIdentityDone(true);
+    } catch (err) {
+      // Backend returns 400 "This email is already in use" on conflict.
+      setIdentityError(err?.message || "Could not save your details. Please try again.");
+    } finally {
+      setSavingIdentity(false);
+    }
+  }
+
+  // Identity screen comes first — collect name + email before the preferences quiz.
+  if (!identityDone) {
+    return (
+      <main className="h-screen flex items-center justify-center bg-background px-4 overflow-hidden">
+        <div className="w-full max-w-md bg-surface rounded-xl shadow-md p-8">
+          <h1 className="text-2xl font-bold text-primary mb-1">Welcome aboard!</h1>
+          <p className="text-sm text-muted mb-6">
+            Let&apos;s set up your account. Tell us your name and email.
+          </p>
+
+          <form onSubmit={handleSaveIdentity} className="flex flex-col gap-4">
+            <div className="flex flex-col gap-1">
+              <label className="text-sm font-medium text-primary">Full name</label>
+              <input
+                type="text"
+                value={fullName}
+                onChange={(e) => setFullName(e.target.value)}
+                required
+                placeholder="Asha Verma"
+                className="border border-gray-200 rounded-md px-3 py-2 text-sm text-primary placeholder:text-muted focus:outline-none focus:border-accent transition-colors"
+              />
+            </div>
+
+            <div className="flex flex-col gap-1">
+              <label className="text-sm font-medium text-primary">Email</label>
+              <input
+                type="email"
+                value={email}
+                onChange={(e) => setEmail(e.target.value)}
+                required
+                placeholder="you@example.com"
+                className="border border-gray-200 rounded-md px-3 py-2 text-sm text-primary placeholder:text-muted focus:outline-none focus:border-accent transition-colors"
+              />
+            </div>
+
+            {identityError && (
+              <p className="text-xs text-red-500 bg-red-50 border border-red-100 rounded-md px-3 py-2">
+                {identityError}
+              </p>
+            )}
+
+            <button
+              type="submit"
+              disabled={savingIdentity}
+              className="w-full bg-accent text-primary font-bold rounded-md px-4 py-2.5 hover:bg-accent/90 transition-colors disabled:opacity-60 flex items-center justify-center gap-2 cursor-pointer"
+            >
+              {savingIdentity && <Loader2 className="h-4 w-4 animate-spin" />}
+              {savingIdentity ? "Saving…" : "Continue"}
+            </button>
+          </form>
+        </div>
+      </main>
+    );
+  }
 
   const current = STEPS[step - 1];
 
