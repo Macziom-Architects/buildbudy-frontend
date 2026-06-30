@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useSyncExternalStore, useRef } from "react";
+import { useState, useRef } from "react";
 import Link from "next/link";
 import Image from "next/image";
 import { usePathname } from "next/navigation";
@@ -8,6 +8,7 @@ import { MapPin, User, ShoppingCart, Heart, Menu, X, ChevronRight, Truck } from 
 import { useWishlist } from "@/context/WishlistContext";
 import SearchBar from "@/components/ui/SearchBar";
 import { useCart } from "@/context/CartContext";
+import { useAuth } from "@/hooks/useAuth";
 
 const LOCATION = { city: "Mumbai", area: "Andheri West", pincode: "400058" };
 
@@ -73,14 +74,7 @@ export default function Navbar() {
   const { wishlist } = useWishlist();
   const cartCount    = cartItems.reduce((sum, item) => sum + item.quantity, 0);
   const wishCount    = wishlist.length;
-  const isLoggedIn = useSyncExternalStore(
-    (callback) => {
-      window.addEventListener("storage", callback);
-      return () => window.removeEventListener("storage", callback);
-    },
-    () => !!localStorage.getItem("bb_logged_in"),
-    () => false
-  );
+  const { isLoggedIn } = useAuth();
   const pathname = usePathname();
 
   return (

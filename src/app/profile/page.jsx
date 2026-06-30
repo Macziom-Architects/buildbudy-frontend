@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useSyncExternalStore, useEffect, useCallback, useMemo } from "react";
+import { useState, useEffect, useCallback, useMemo, Suspense } from "react";
 import Link from "next/link";
 import { useRouter, useSearchParams } from "next/navigation";
 import {
@@ -8,81 +8,30 @@ import {
   LogOut, ChevronRight, Plus, Edit2, Trash2, Shield,
   Package, CheckCircle, Clock, Truck, Home, Bell,
   Phone, Camera, X, Loader2, Building2, ArrowRight,
-  Tag, BookOpen, Wrench, CheckCircle2,
-  XCircle,
+  Tag, BookOpen, Wrench, CheckCircle2, XCircle,
 } from "lucide-react";
 import Footer from "@/components/layout/Footer";
+import { Skeleton } from "@/components/ui/Skeleton";
+import { useAuth } from "@/hooks/useAuth";
+import { useOrders } from "@/hooks/useOrders";
+import { useFetch } from "@/hooks/useFetch";
 import { useWishlist } from "@/context/WishlistContext";
 import { useCart } from "@/context/CartContext";
-import { MOCK_ORDERS, STATUS_CONFIG } from "@/lib/ordersData";
-import { Suspense } from "react";
+import { STATUS_CONFIG } from "@/lib/ordersData";
+import {
+  getAddresses,
+  createAddress,
+  updateAddress as apiUpdateAddress,
+  deleteAddress as apiDeleteAddress,
+  setDefaultAddress,
+} from "@/lib/api/addresses";
+import {
+  getNotifications,
+  getUnreadCount as fetchUnreadCount,
+} from "@/lib/api/notifications";
 
 // ─── Constants ─────────────────────────────────────────────────────────────────
 
-const MOCK_USER = {
-  name: "Ravi Kumar",
-  phone: "+91 98765 43210",
-  avatar: null,
-  memberSince: "Jan 2024",
-};
-
-const MOCK_ADDRESSES = [
-  {
-    id: 1, label: "Home", name: "Ravi Kumar",
-    line1: "204, Sunflower Apartments", line2: "Andheri West, Mumbai",
-    city: "Mumbai", state: "Maharashtra", pincode: "400058",
-    phone: "+91 98765 43210", isDefault: true,
-  },
-  {
-    id: 2, label: "Office", name: "Ravi Kumar",
-    line1: "Block C, Tech Park", line2: "Powai",
-    city: "Mumbai", state: "Maharashtra", pincode: "400076",
-    phone: "+91 98765 43210", isDefault: false,
-  },
-];
-
-// ─── LocalStorage helpers ───────────────────────────────────────────────────────
-
-function loadUser() {
-  try {
-    const profile = localStorage.getItem("bb_user_profile");
-    if (profile) return { ...MOCK_USER, ...JSON.parse(profile) };
-    const pending = localStorage.getItem("bb_signup_pending");
-    if (pending) return { ...MOCK_USER, ...JSON.parse(pending) };
-  } catch {}
-  return MOCK_USER;
-}
-
-function saveUser(data) {
-  try { localStorage.setItem("bb_user_profile", JSON.stringify(data)); } catch {}
-}
-
-function loadAddresses() {
-  try {
-    const stored = localStorage.getItem("bb_addresses");
-    if (stored) return JSON.parse(stored);
-  } catch {}
-  return MOCK_ADDRESSES;
-}
-
-function persistAddresses(list) {
-  try { localStorage.setItem("bb_addresses", JSON.stringify(list)); } catch {}
-}
-
-function getUnreadCount() {
-  try {
-    const stored = localStorage.getItem("bb_notifications");
-    if (stored) {
-      const notifs = JSON.parse(stored);
-      return notifs.filter((n) => !n.read).length;
-    }
-  } catch {}
-  return 5; // default unread from seed data
-}
-
-// ─── Address Modal ──────────────────────────────────────────────────────────────
-
-const LABEL_OPTIONS = ["Home", "Office", "Other"];
 const STATES = [
   "Andhra Pradesh","Assam","Bihar","Chhattisgarh","Delhi","Goa","Gujarat",
   "Haryana","Himachal Pradesh","Jharkhand","Karnataka","Kerala","Madhya Pradesh",
@@ -90,6 +39,10 @@ const STATES = [
   "Rajasthan","Sikkim","Tamil Nadu","Telangana","Tripura","Uttar Pradesh",
   "Uttarakhand","West Bengal",
 ];
+
+const LABEL_OPTIONS = ["Home", "Office", "Other"];
+
+// ─── Address Modal ──────────────────────────────────────────────────────────────
 
 function AddressModal({ address, onClose, onSave }) {
   const blank = {
@@ -106,10 +59,14 @@ function AddressModal({ address, onClose, onSave }) {
   async function handleSubmit(e) {
     e.preventDefault();
     setSaving(true);
-    await new Promise((r) => setTimeout(r, 400));
-    onSave(form);
-    setSaving(false);
-    onClose();
+    try {
+      await onSave(form);
+      onClose();
+    } catch {
+      // keep modal open on API error
+    } finally {
+      setSaving(false);
+    }
   }
 
   const inputCls = "w-full border border-gray-200 rounded-lg px-3 py-2.5 text-sm text-primary placeholder:text-muted focus:outline-none focus:border-accent focus:ring-1 focus:ring-accent/30 transition-all";
@@ -235,13 +192,52 @@ const ORDER_STATUS_ICONS = {
   "Cancelled":        XCircle,
 };
 
-function OrdersSection() {
-  const recent = MOCK_ORDERS.slice(0, 3);
+function OrdersSection({ orders, total, loading }) {
+  const recent = orders.slice(0, 3);
+
+  if (loading) {
+    return (
+      <SectionWrapper title="My Orders" subtitle="Loading…">
+        <div className="space-y-3">
+          {[1, 2, 3].map((i) => (
+            <div key={i} className="flex items-center gap-4 p-4 rounded-xl border border-gray-100">
+              <Skeleton className="h-10 w-10 rounded-xl flex-shrink-0" />
+              <div className="flex-1 space-y-2">
+                <div className="flex gap-2">
+                  <Skeleton className="h-3 w-32" />
+                  <Skeleton className="h-3 w-16 rounded-full" />
+                </div>
+                <Skeleton className="h-3 w-48" />
+              </div>
+              <Skeleton className="h-4 w-16 flex-shrink-0" />
+            </div>
+          ))}
+        </div>
+      </SectionWrapper>
+    );
+  }
+
+  if (recent.length === 0) {
+    return (
+      <SectionWrapper title="My Orders" subtitle="0 orders placed">
+        <div className="flex flex-col items-center py-10 text-center">
+          <div className="h-14 w-14 rounded-2xl bg-gray-100 flex items-center justify-center mb-3">
+            <ShoppingBag className="h-7 w-7 text-gray-300" />
+          </div>
+          <p className="text-sm font-bold text-primary mb-1">No orders yet</p>
+          <p className="text-xs text-muted mb-4">Your order history will appear here once you place an order.</p>
+          <Link href="/products" className="inline-flex items-center gap-2 bg-primary text-white text-xs font-semibold px-4 py-2 rounded-lg hover:bg-primary/90 transition-colors">
+            Start Shopping
+          </Link>
+        </div>
+      </SectionWrapper>
+    );
+  }
 
   return (
     <SectionWrapper
       title="My Orders"
-      subtitle={`${MOCK_ORDERS.length} orders placed`}
+      subtitle={`${total} order${total !== 1 ? "s" : ""} placed`}
       action={
         <Link href="/orders" className="flex items-center gap-1 text-xs font-semibold text-accent hover:text-accent/80 transition-colors cursor-pointer">
           View All <ArrowRight className="h-3.5 w-3.5" />
@@ -293,7 +289,7 @@ function OrdersSection() {
   );
 }
 
-// ─── Wishlist section ────────────────────────────────────────────────────────────
+// ─── Wishlist section (frontend-only, backed by WishlistContext) ─────────────────
 
 function WishlistSection() {
   const { wishlist, removeFromWishlist } = useWishlist();
@@ -377,35 +373,60 @@ function WishlistSection() {
 // ─── Addresses section ──────────────────────────────────────────────────────────
 
 function AddressesSection() {
-  const [addresses, setAddresses] = useState([]);
   const [modal, setModal] = useState(null);
+  const { data, loading, error, refetch } = useFetch(getAddresses, []);
+  const addresses = data ?? [];
 
-  useEffect(() => { setAddresses(loadAddresses()); }, []);
-
-  const save = useCallback((list) => {
-    setAddresses(list);
-    persistAddresses(list);
-  }, []);
-
-  function handleSave(form) {
-    let updated = form.isDefault ? addresses.map((a) => ({ ...a, isDefault: false })) : [...addresses];
-    if (!form.id) {
-      updated = [...updated, { ...form, id: Date.now() }];
+  async function handleSave(form) {
+    if (form.id) {
+      await apiUpdateAddress(form.id, form);
     } else {
-      updated = updated.map((a) => (a.id === form.id ? form : a));
+      await createAddress(form);
     }
-    if (!updated.some((a) => a.isDefault) && updated.length > 0) {
-      updated[0] = { ...updated[0], isDefault: true };
-    }
-    save(updated);
+    await refetch();
   }
 
-  function handleDelete(id) {
-    const updated = addresses.filter((a) => a.id !== id);
-    if (!updated.some((a) => a.isDefault) && updated.length > 0) {
-      updated[0] = { ...updated[0], isDefault: true };
-    }
-    save(updated);
+  async function handleDelete(id) {
+    await apiDeleteAddress(id);
+    await refetch();
+  }
+
+  async function handleSetDefault(id) {
+    await setDefaultAddress(id);
+    await refetch();
+  }
+
+  if (loading) {
+    return (
+      <SectionWrapper title="Saved Addresses" subtitle="Manage your delivery addresses">
+        <div className="grid sm:grid-cols-2 gap-4">
+          {[1, 2].map((i) => (
+            <div key={i} className="p-4 rounded-xl border border-gray-100 space-y-3">
+              <div className="flex items-center gap-2">
+                <Skeleton className="h-7 w-7 rounded-lg" />
+                <Skeleton className="h-4 w-20" />
+              </div>
+              <Skeleton className="h-3 w-32" />
+              <Skeleton className="h-3 w-full max-w-[200px]" />
+              <Skeleton className="h-3 w-40" />
+            </div>
+          ))}
+        </div>
+      </SectionWrapper>
+    );
+  }
+
+  if (error) {
+    return (
+      <SectionWrapper title="Saved Addresses" subtitle="Manage your delivery addresses">
+        <div className="flex flex-col items-center py-8 text-center">
+          <p className="text-sm text-red-500 mb-3">Failed to load addresses.</p>
+          <button onClick={refetch} className="text-xs font-semibold text-accent hover:underline cursor-pointer">
+            Try again
+          </button>
+        </div>
+      </SectionWrapper>
+    );
   }
 
   return (
@@ -438,7 +459,12 @@ function AddressesSection() {
               )}
               <div className="flex items-center gap-2 mb-3">
                 <div className="h-7 w-7 rounded-lg bg-primary/10 flex items-center justify-center">
-                  {addr.label === "Home" ? <Home className="h-3.5 w-3.5 text-primary" /> : addr.label === "Office" ? <Building2 className="h-3.5 w-3.5 text-primary" /> : <MapPin className="h-3.5 w-3.5 text-primary" />}
+                  {addr.label === "Home"
+                    ? <Home className="h-3.5 w-3.5 text-primary" />
+                    : addr.label === "Office"
+                      ? <Building2 className="h-3.5 w-3.5 text-primary" />
+                      : <MapPin className="h-3.5 w-3.5 text-primary" />
+                  }
                 </div>
                 <span className="text-sm font-bold text-primary">{addr.label}</span>
               </div>
@@ -456,7 +482,7 @@ function AddressesSection() {
                     <button onClick={() => handleDelete(addr.id)} className="flex items-center gap-1 text-xs font-medium text-muted hover:text-red-500 transition-colors cursor-pointer">
                       <Trash2 className="h-3 w-3" /> Remove
                     </button>
-                    <button onClick={() => save(addresses.map((a) => ({ ...a, isDefault: a.id === addr.id })))} className="ml-auto text-xs font-medium text-accent hover:text-accent/80 transition-colors cursor-pointer">
+                    <button onClick={() => handleSetDefault(addr.id)} className="ml-auto text-xs font-medium text-accent hover:text-accent/80 transition-colors cursor-pointer">
                       Set Default
                     </button>
                   </>
@@ -479,7 +505,7 @@ function AddressesSection() {
   );
 }
 
-// ─── Notifications section ──────────────────────────────────────────────────────
+// ─── Notifications section (API-backed, placeholder for backend push) ────────────
 
 const NOTIF_TYPE_CONFIG = {
   order:   { icon: Package,    bg: "bg-blue-50",    text: "text-blue-600"    },
@@ -491,40 +517,34 @@ const NOTIF_TYPE_CONFIG = {
 };
 
 function NotificationsSection() {
-  const [notifs, setNotifs] = useState([]);
-
-  useEffect(() => {
-    try {
-      const stored = localStorage.getItem("bb_notifications");
-      if (stored) setNotifs(JSON.parse(stored));
-      else {
-        // Use first 5 seeds from notifications page
-        const seeds = [
-          { id: 1, type: "order",   read: false, title: "Order Delivered!", message: "BB-20240312-1892 delivered successfully.", time: "2 hours ago", href: "/orders/BB-20240312-1892" },
-          { id: 2, type: "offer",   read: false, title: "Flash Sale: Power Tools — 40% Off", message: "Bosch, Makita, Stanley. Limited stock.", time: "3 hours ago", href: "/products" },
-          { id: 3, type: "service", read: false, title: "Service Booking Confirmed", message: "Plumbing service confirmed for tomorrow 10 AM.", time: "5 hours ago", href: "/services" },
-          { id: 4, type: "order",   read: false, title: "Order Shipped", message: "BB-20240228-0741 is on its way.", time: "1 day ago", href: "/orders/BB-20240228-0741" },
-          { id: 5, type: "diy",     read: false, title: "New DIY Guide Published", message: "Monsoon-Proofing Your Home — now live.", time: "1 day ago", href: "/diy" },
-        ];
-        setNotifs(seeds);
-      }
-    } catch {}
-  }, []);
-
+  const { data, loading } = useFetch(() => getNotifications(), []);
+  const notifs = data ?? [];
   const recent = notifs.slice(0, 5);
   const unread = notifs.filter((n) => !n.read).length;
 
   return (
     <SectionWrapper
       title="Notifications"
-      subtitle={unread > 0 ? `${unread} unread` : "All caught up"}
+      subtitle={loading ? "Loading…" : unread > 0 ? `${unread} unread` : "All caught up"}
       action={
         <Link href="/notifications" className="flex items-center gap-1 text-xs font-semibold text-accent hover:text-accent/80 transition-colors">
           View All <ArrowRight className="h-3.5 w-3.5" />
         </Link>
       }
     >
-      {recent.length === 0 ? (
+      {loading ? (
+        <div className="space-y-2.5">
+          {[1, 2, 3].map((i) => (
+            <div key={i} className="flex items-start gap-3 p-3 rounded-xl border border-gray-100">
+              <Skeleton className="h-8 w-8 rounded-lg flex-shrink-0" />
+              <div className="flex-1 space-y-2">
+                <Skeleton className="h-3 w-3/4" />
+                <Skeleton className="h-2.5 w-1/3" />
+              </div>
+            </div>
+          ))}
+        </div>
+      ) : recent.length === 0 ? (
         <div className="flex flex-col items-center py-10 text-center">
           <Bell className="h-8 w-8 text-gray-300 mb-3" />
           <p className="text-sm font-semibold text-primary mb-1">No notifications</p>
@@ -569,7 +589,7 @@ function NotificationsSection() {
   );
 }
 
-// ─── Saved Payments section ─────────────────────────────────────────────────────
+// ─── Saved Payments section (frontend placeholder) ──────────────────────────────
 
 function PaymentsSection() {
   return (
@@ -594,21 +614,24 @@ function PaymentsSection() {
 
 // ─── Settings section ───────────────────────────────────────────────────────────
 
-function SettingsSection() {
-  const [user, setUser] = useState(MOCK_USER);
+function SettingsSection({ user, onUpdateProfile }) {
+  const [form, setForm] = useState({ name: user?.name ?? "", phone: user?.phone ?? "" });
   const [saved, setSaved] = useState(false);
   const [saving, setSaving] = useState(false);
   const [notifications, setNotifications] = useState({ sms: true, push: false });
 
-  useEffect(() => { setUser(loadUser()); }, []);
+  useEffect(() => {
+    if (user) setForm({ name: user.name ?? "", phone: user.phone ?? "" });
+  }, [user]);
 
   async function handleSave() {
     setSaving(true);
-    await new Promise((r) => setTimeout(r, 600));
-    saveUser(user);
+    try {
+      await onUpdateProfile({ name: form.name });
+      setSaved(true);
+      setTimeout(() => setSaved(false), 2500);
+    } catch {}
     setSaving(false);
-    setSaved(true);
-    setTimeout(() => setSaved(false), 2500);
   }
 
   const inputCls = "w-full pl-9 pr-4 py-2.5 text-sm border border-gray-200 rounded-lg focus:outline-none focus:border-accent focus:ring-1 focus:ring-accent/30 transition-all";
@@ -621,7 +644,12 @@ function SettingsSection() {
             <label className="block text-xs font-semibold text-muted mb-1.5 uppercase tracking-wider">Full Name</label>
             <div className="relative">
               <User className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-gray-400" />
-              <input value={user.name} onChange={(e) => setUser((p) => ({ ...p, name: e.target.value }))} className={inputCls} />
+              <input
+                value={form.name}
+                onChange={(e) => setForm((p) => ({ ...p, name: e.target.value }))}
+                placeholder="Your name"
+                className={inputCls}
+              />
             </div>
           </div>
           <div>
@@ -629,7 +657,7 @@ function SettingsSection() {
             <div className="relative">
               <Phone className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-gray-400" />
               <input
-                value={user.phone}
+                value={form.phone}
                 readOnly
                 title="Mobile number is verified and cannot be changed here"
                 className={`${inputCls} bg-gray-50 cursor-not-allowed`}
@@ -696,55 +724,56 @@ function ProfilePageInner() {
   const searchParams = useSearchParams();
   const initialSection = searchParams.get("section") ?? "orders";
   const [activeSection, setActiveSection] = useState(initialSection);
-  const [user, setUser] = useState(MOCK_USER);
-  const [unreadCount, setUnreadCount] = useState(5);
+  const [unreadCount, setUnreadCount] = useState(0);
   const router = useRouter();
+
+  const { isLoggedIn, user, logout, updateProfile, loading: authLoading } = useAuth();
+  const { orders, total: ordersTotal, loading: ordersLoading } = useOrders();
   const { wishlist } = useWishlist();
 
-  const isLoggedIn = useSyncExternalStore(
-    (cb) => { window.addEventListener("storage", cb); return () => window.removeEventListener("storage", cb); },
-    () => !!localStorage.getItem("bb_logged_in"),
-    () => false,
-  );
+  useEffect(() => {
+    if (!authLoading && !isLoggedIn) {
+      router.replace("/auth/login");
+    }
+  }, [isLoggedIn, authLoading, router]);
 
   useEffect(() => {
-    if (typeof window === "undefined") return;
-    if (!localStorage.getItem("bb_logged_in")) {
-      router.replace("/auth/login");
-      return;
-    }
-    setUser(loadUser());
-    setUnreadCount(getUnreadCount());
-  }, [router]);
+    if (!isLoggedIn) return;
+    fetchUnreadCount()
+      .then((count) => setUnreadCount(typeof count === "number" ? count : 0))
+      .catch(() => {});
+  }, [isLoggedIn]);
 
   const SIDEBAR_ITEMS = useMemo(() => [
-    { id: "orders",        label: "My Orders",       icon: ShoppingBag, badge: MOCK_ORDERS.length },
-    { id: "addresses",     label: "Saved Addresses", icon: MapPin       },
-    { id: "wishlist",      label: "Wishlist",         icon: Heart,       badge: wishlist.length > 0 ? wishlist.length : null },
-    { id: "notifications", label: "Notifications",   icon: Bell,        badge: unreadCount > 0 ? unreadCount : null },
-    { id: "payments",      label: "Saved Payments",  icon: CreditCard   },
-    { id: "settings",      label: "Account Settings", icon: Settings    },
-  ], [wishlist.length, unreadCount]);
+    { id: "orders",        label: "My Orders",        icon: ShoppingBag, badge: ordersTotal > 0 ? ordersTotal : null },
+    { id: "addresses",     label: "Saved Addresses",  icon: MapPin       },
+    { id: "wishlist",      label: "Wishlist",          icon: Heart,       badge: wishlist.length > 0 ? wishlist.length : null },
+    { id: "notifications", label: "Notifications",    icon: Bell,        badge: unreadCount > 0 ? unreadCount : null },
+    { id: "payments",      label: "Saved Payments",   icon: CreditCard   },
+    { id: "settings",      label: "Account Settings", icon: Settings     },
+  ], [ordersTotal, wishlist.length, unreadCount]);
 
-  const handleLogout = () => {
-    localStorage.removeItem("bb_logged_in");
-    window.dispatchEvent(new Event("storage"));
+  const handleLogout = useCallback(async () => {
+    await logout();
     router.push("/auth/login");
-  };
+  }, [logout, router]);
 
   const renderSection = () => {
     switch (activeSection) {
-      case "orders":        return <OrdersSection />;
+      case "orders":        return <OrdersSection orders={orders} total={ordersTotal} loading={ordersLoading} />;
       case "addresses":     return <AddressesSection />;
       case "wishlist":      return <WishlistSection />;
       case "notifications": return <NotificationsSection />;
       case "payments":      return <PaymentsSection />;
-      case "settings":      return <SettingsSection />;
+      case "settings":      return <SettingsSection user={user} onUpdateProfile={updateProfile} />;
       default:              return null;
     }
   };
 
-  const initials = user.name.split(" ").map((n) => n[0]).join("").slice(0, 2).toUpperCase();
+  const displayName    = user?.name        ?? "BuildBudy User";
+  const displayPhone   = user?.phone       ?? "";
+  const displaySince   = user?.memberSince ?? "";
+  const initials       = displayName.split(" ").map((n) => n[0]).join("").slice(0, 2).toUpperCase() || "BB";
 
   return (
     <div className="flex min-h-screen flex-col bg-[#F5F6FA]">
@@ -752,60 +781,78 @@ function ProfilePageInner() {
       {/* ── Profile header ──────────────────────────────────────────── */}
       <div className="bg-primary px-4 py-10 sm:px-6 lg:px-8">
         <div className="mx-auto max-w-[1400px]">
-          <div className="flex flex-col sm:flex-row items-start sm:items-center gap-5">
-
-            {/* Avatar */}
-            <div className="relative flex-shrink-0">
-              <div className="h-20 w-20 rounded-2xl bg-accent/20 flex items-center justify-center border-2 border-accent/30">
-                {user.avatar
-                  ? <img src={user.avatar} alt="" className="h-full w-full object-cover rounded-2xl" />
-                  : <span className="text-2xl font-bold text-accent">{initials}</span>
-                }
+          {authLoading ? (
+            <div className="flex flex-col sm:flex-row items-start sm:items-center gap-5">
+              <Skeleton className="h-20 w-20 rounded-2xl flex-shrink-0 bg-white/20" />
+              <div className="flex-1 space-y-3">
+                <Skeleton className="h-6 w-48 bg-white/20" />
+                <Skeleton className="h-4 w-64 bg-white/10" />
               </div>
-              <button
-                onClick={() => setActiveSection("settings")}
-                className="absolute -bottom-1.5 -right-1.5 h-7 w-7 rounded-full bg-accent text-primary flex items-center justify-center shadow-md hover:bg-accent/90 transition-colors cursor-pointer"
-              >
-                <Camera className="h-3.5 w-3.5" />
-              </button>
-            </div>
-
-            {/* Info */}
-            <div className="flex-1 min-w-0">
-              <h1 className="text-xl font-bold text-white">{user.name}</h1>
-              <p className="text-sm text-white/60 mt-0.5">BuildBudy Member</p>
-              <div className="flex flex-wrap items-center gap-3 mt-2.5">
-                {user.phone && (
-                  <span className="inline-flex items-center gap-1.5 text-xs text-white/50">
-                    <Phone className="h-3 w-3" /> {user.phone}
-                  </span>
-                )}
-                <span className="inline-flex items-center gap-1.5 text-xs">
-                  <Shield className="h-3 w-3 text-emerald-400" />
-                  <span className="text-emerald-400 font-medium">Verified</span>
-                </span>
-                {user.memberSince && <span className="text-xs text-white/40">Member since {user.memberSince}</span>}
+              <div className="flex gap-5">
+                {[1, 2, 3].map((i) => (
+                  <div key={i} className="text-center space-y-1.5">
+                    <Skeleton className="h-6 w-8 mx-auto bg-white/20" />
+                    <Skeleton className="h-3 w-14 bg-white/10" />
+                  </div>
+                ))}
               </div>
             </div>
+          ) : (
+            <div className="flex flex-col sm:flex-row items-start sm:items-center gap-5">
 
-            {/* Quick stats */}
-            <div className="flex gap-5 flex-shrink-0">
-              {[
-                { label: "Orders",   value: MOCK_ORDERS.length, section: "orders"    },
-                { label: "Wishlist", value: wishlist.length,    section: "wishlist"  },
-                { label: "Alerts",   value: unreadCount,        section: "notifications" },
-              ].map(({ label, value, section }) => (
+              {/* Avatar */}
+              <div className="relative flex-shrink-0">
+                <div className="h-20 w-20 rounded-2xl bg-accent/20 flex items-center justify-center border-2 border-accent/30">
+                  {user?.avatar
+                    ? <img src={user.avatar} alt="" className="h-full w-full object-cover rounded-2xl" />
+                    : <span className="text-2xl font-bold text-accent">{initials}</span>
+                  }
+                </div>
                 <button
-                  key={label}
-                  onClick={() => setActiveSection(section)}
-                  className="text-center cursor-pointer group"
+                  onClick={() => setActiveSection("settings")}
+                  className="absolute -bottom-1.5 -right-1.5 h-7 w-7 rounded-full bg-accent text-primary flex items-center justify-center shadow-md hover:bg-accent/90 transition-colors cursor-pointer"
                 >
-                  <p className="text-xl font-bold text-white group-hover:text-accent transition-colors">{value}</p>
-                  <p className="text-xs text-white/50 mt-0.5">{label}</p>
+                  <Camera className="h-3.5 w-3.5" />
                 </button>
-              ))}
+              </div>
+
+              {/* Info */}
+              <div className="flex-1 min-w-0">
+                <h1 className="text-xl font-bold text-white">{displayName}</h1>
+                <p className="text-sm text-white/60 mt-0.5">BuildBudy Member</p>
+                <div className="flex flex-wrap items-center gap-3 mt-2.5">
+                  {displayPhone && (
+                    <span className="inline-flex items-center gap-1.5 text-xs text-white/50">
+                      <Phone className="h-3 w-3" /> {displayPhone}
+                    </span>
+                  )}
+                  <span className="inline-flex items-center gap-1.5 text-xs">
+                    <Shield className="h-3 w-3 text-emerald-400" />
+                    <span className="text-emerald-400 font-medium">Verified</span>
+                  </span>
+                  {displaySince && <span className="text-xs text-white/40">Member since {displaySince}</span>}
+                </div>
+              </div>
+
+              {/* Quick stats */}
+              <div className="flex gap-5 flex-shrink-0">
+                {[
+                  { label: "Orders",   value: ordersTotal,      section: "orders"        },
+                  { label: "Wishlist", value: wishlist.length,  section: "wishlist"      },
+                  { label: "Alerts",   value: unreadCount,      section: "notifications" },
+                ].map(({ label, value, section }) => (
+                  <button
+                    key={label}
+                    onClick={() => setActiveSection(section)}
+                    className="text-center cursor-pointer group"
+                  >
+                    <p className="text-xl font-bold text-white group-hover:text-accent transition-colors">{value}</p>
+                    <p className="text-xs text-white/50 mt-0.5">{label}</p>
+                  </button>
+                ))}
+              </div>
             </div>
-          </div>
+          )}
         </div>
       </div>
 

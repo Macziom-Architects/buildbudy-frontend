@@ -4,18 +4,18 @@ import { useState, useEffect } from "react";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { Phone, Loader2, ShieldCheck } from "lucide-react";
+import { useAuth } from "@/hooks/useAuth";
 
 export default function LoginPage() {
   const router = useRouter();
+  const { isLoggedIn, requestOtp } = useAuth();
   const [phone, setPhone] = useState("");
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState("");
 
   useEffect(() => {
-    if (typeof window !== "undefined" && localStorage.getItem("bb_logged_in")) {
-      router.replace("/");
-    }
-  }, [router]);
+    if (isLoggedIn) router.replace("/");
+  }, [isLoggedIn, router]);
 
   function handlePhoneChange(e) {
     const val = e.target.value.replace(/\D/g, "").slice(0, 10);
@@ -30,10 +30,15 @@ export default function LoginPage() {
       return;
     }
     setLoading(true);
-    await new Promise((res) => setTimeout(res, 700));
-    localStorage.setItem("bb_pending_phone", phone);
-    setLoading(false);
-    router.push("/auth/otp");
+    setError("");
+    try {
+      await requestOtp(phone);
+      router.push("/auth/otp");
+    } catch (err) {
+      setError(err?.message || "Failed to send OTP. Please try again.");
+    } finally {
+      setLoading(false);
+    }
   }
 
   return (

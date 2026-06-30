@@ -3,14 +3,17 @@
 import { useState, useRef, useEffect, Suspense } from "react";
 import { useRouter } from "next/navigation";
 import { Phone, CheckCircle, Loader2 } from "lucide-react";
+import { useAuth } from "@/hooks/useAuth";
 
 function OTPForm() {
   const router = useRouter();
+  const { requestOtp, verifyOtp } = useAuth();
   const [otp, setOtp] = useState(Array(6).fill(""));
   const [timer, setTimer] = useState(60);
   const [canResend, setCanResend] = useState(false);
   const [phone, setPhone] = useState("");
   const [verifying, setVerifying] = useState(false);
+  const [error, setError] = useState("");
   const inputs = useRef([]);
 
   useEffect(() => {
@@ -35,6 +38,7 @@ function OTPForm() {
     const next = [...otp];
     next[index] = digit;
     setOtp(next);
+    if (error) setError("");
     if (digit && index < 5) inputs.current[index + 1]?.focus();
   }
 
@@ -54,34 +58,35 @@ function OTPForm() {
     inputs.current[Math.min(text.length, 5)]?.focus();
   }
 
-  function handleResend() {
+  async function handleResend() {
     setOtp(Array(6).fill(""));
     setTimer(60);
     setCanResend(false);
+    setError("");
     inputs.current[0]?.focus();
+    try {
+      await requestOtp(phone);
+    } catch (err) {
+      setError(err?.message || "Failed to resend OTP. Please try again.");
+    }
   }
 
   async function handleVerify() {
-    if (otp.join("").length < 6) return;
+    const otpCode = otp.join("");
+    if (otpCode.length < 6) return;
     setVerifying(true);
-    await new Promise((res) => setTimeout(res, 600));
-
-    localStorage.setItem("bb_logged_in", "true");
-    localStorage.removeItem("bb_pending_phone");
-    window.dispatchEvent(new Event("storage"));
-
-    const existingProfile = localStorage.getItem("bb_user_profile");
-    if (existingProfile) {
-      router.push("/");
-    } else {
-      localStorage.setItem(
-        "bb_signup_pending",
-        JSON.stringify({
-          phone: `+91 ${phone}`,
-          memberSince: new Date().toLocaleDateString("en-IN", { month: "short", year: "numeric" }),
-        })
-      );
-      router.push("/onboarding");
+    setError("");
+    try {
+      const { isNewUser } = await verifyOtp(phone, otpCode);
+      localStorage.removeItem("bb_pending_phone");
+      if (isNewUser) {
+        router.push("/onboarding");
+      } else {
+        router.push("/");
+      }
+    } catch (err) {
+      setError(err?.message || "Invalid OTP. Please try again.");
+      setVerifying(false);
     }
   }
 
@@ -105,7 +110,7 @@ function OTPForm() {
           <span className="text-primary font-semibold">{maskedPhone}</span>
         </p>
 
-        <div className="flex gap-2 justify-center mb-6" onPaste={handlePaste}>
+        <div className="flex gap-2 justify-center mb-4" onPaste={handlePaste}>
           {otp.map((digit, i) => (
             <input
               key={i}
@@ -120,6 +125,12 @@ function OTPForm() {
             />
           ))}
         </div>
+
+        {error && (
+          <p className="text-xs text-red-500 bg-red-50 border border-red-100 rounded-md px-3 py-2 mb-4">
+            {error}
+          </p>
+        )}
 
         <button
           onClick={handleVerify}

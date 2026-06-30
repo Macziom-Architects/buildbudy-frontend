@@ -8,6 +8,7 @@ import {
   CheckCircle2, XCircle,
   MapPin, CheckCircle, User,
 } from "lucide-react";
+import { useAuth } from "@/hooks/useAuth";
 
 const PREFERENCE_STEPS = [
   {
@@ -58,6 +59,7 @@ const INITIAL_PREFS = { project: null, needs: [], help: null, location: null };
 
 export default function OnboardingPage() {
   const router = useRouter();
+  const { isLoggedIn, user, completeOnboarding } = useAuth();
   const [step, setStep] = useState(1);
   const [name, setName] = useState("");
   const [nameError, setNameError] = useState("");
@@ -68,10 +70,8 @@ export default function OnboardingPage() {
   const [done, setDone] = useState(false);
 
   useEffect(() => {
-    if (!localStorage.getItem("bb_logged_in")) {
-      router.replace("/auth/login");
-    }
-  }, [router]);
+    if (!isLoggedIn) router.replace("/auth/login");
+  }, [isLoggedIn, router]);
 
   const currentPrefStep = PREFERENCE_STEPS.find((s) => s.id === step);
 
@@ -120,7 +120,7 @@ export default function OnboardingPage() {
     return true;
   })();
 
-  function handleContinue() {
+  async function handleContinue() {
     if (step === 1) {
       if (name.trim().length < 2) {
         setNameError("Please enter your full name.");
@@ -135,20 +135,14 @@ export default function OnboardingPage() {
       const loc =
         answers.location ||
         (city.trim() ? { city, pincode: pincode.trim(), type: "manual" } : null);
-      const final = { ...answers, location: loc };
-      localStorage.setItem("bb_onboarding", JSON.stringify(final));
+      const preferences = { ...answers, location: loc };
+      const phone = user?.phone || localStorage.getItem("bb_pending_phone") || "";
 
-      const pending = (() => {
-        try { return JSON.parse(localStorage.getItem("bb_signup_pending") || "{}"); } catch { return {}; }
-      })();
-      const profile = {
-        name: name.trim(),
-        phone: pending.phone || "",
-        memberSince: pending.memberSince || new Date().toLocaleDateString("en-IN", { month: "short", year: "numeric" }),
-      };
-      localStorage.setItem("bb_user_profile", JSON.stringify(profile));
-      localStorage.removeItem("bb_signup_pending");
-      window.dispatchEvent(new Event("storage"));
+      try {
+        await completeOnboarding({ name: name.trim(), phone, preferences });
+      } catch {
+        // Gracefully continue even if the API call fails so the user isn't stuck
+      }
 
       setDone(true);
       return;
@@ -158,19 +152,6 @@ export default function OnboardingPage() {
   }
 
   function handleSkip() {
-    if (step === 1) {
-      const pending = (() => {
-        try { return JSON.parse(localStorage.getItem("bb_signup_pending") || "{}"); } catch { return {}; }
-      })();
-      const profile = {
-        name: "BuildBudy User",
-        phone: pending.phone || "",
-        memberSince: pending.memberSince || new Date().toLocaleDateString("en-IN", { month: "short", year: "numeric" }),
-      };
-      localStorage.setItem("bb_user_profile", JSON.stringify(profile));
-      localStorage.removeItem("bb_signup_pending");
-      window.dispatchEvent(new Event("storage"));
-    }
     router.push("/");
   }
 
