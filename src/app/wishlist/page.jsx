@@ -9,12 +9,12 @@ import Footer from "@/components/layout/Footer";
 
 export default function WishlistPage() {
   const { wishlist, removeFromWishlist } = useWishlist();
-  const { addToCart, showToast } = useCart();
+  const { addToCart } = useCart();
 
-  function moveToCart(product) {
-    addToCart(product, 1);
-    removeFromWishlist(product.id);
-    showToast(`${product.name.split(" ").slice(0, 3).join(" ")} added to cart`);
+  // CartContext toasts the add itself; only drop the wishlist entry if the
+  // item actually made it into the cart.
+  async function moveToCart(product) {
+    if (await addToCart(product, 1)) removeFromWishlist(product.id);
   }
 
   return (

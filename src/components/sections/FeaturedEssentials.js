@@ -1,7 +1,7 @@
 import Link from "next/link";
 import Image from "next/image";
 import { Sparkles, ArrowRight } from "lucide-react";
-import { getTopProducts } from "@/lib/api/products";
+import { fetchEssentialProducts } from "@/lib/api/products";
 
 const BADGE_COLORS = {
   "Best Seller": "bg-accent text-primary",
@@ -30,7 +30,7 @@ const USE_CASE_MAP = {
 };
 
 function HighlightCard({ product }) {
-  const { name, price, originalPrice, image, badge, routeCategory, id } = product;
+  const { name, price, originalPrice, image, badge, routeCategory, id, slug } = product;
   const discount = originalPrice && originalPrice > price
     ? Math.round(((originalPrice - price) / originalPrice) * 100)
     : 0;
@@ -38,7 +38,7 @@ function HighlightCard({ product }) {
 
   return (
     <div className="group bg-white rounded-2xl shadow-md hover:shadow-lg transition-shadow duration-300 overflow-hidden flex flex-col h-full">
-      <Link href={`/products/${id}`} className="block relative aspect-[2/1] flex-shrink-0 overflow-hidden">
+      <Link href={`/products/${slug ?? id}`} className="block relative aspect-[2/1] flex-shrink-0 overflow-hidden">
         {badge && (
           <span className={`absolute top-3 left-3 z-10 text-[10px] font-bold uppercase tracking-wide px-2.5 py-1 rounded ${BADGE_COLORS[badge] ?? "bg-primary text-white"}`}>
             {badge}
@@ -61,7 +61,7 @@ function HighlightCard({ product }) {
 
       <div className="flex flex-col gap-2.5 p-4 flex-1">
         <UseCasePill label={useCase} />
-        <Link href={`/products/${id}`}>
+        <Link href={`/products/${slug ?? id}`}>
           <h3 className="text-base font-bold text-primary leading-snug hover:text-accent transition-colors duration-150 line-clamp-2">
             {name}
           </h3>
@@ -80,7 +80,7 @@ function HighlightCard({ product }) {
           )}
         </div>
         <Link
-          href={`/products/${id}`}
+          href={`/products/${slug ?? id}`}
           className="mt-1 inline-flex items-center justify-center gap-2 w-full px-5 py-2.5 text-sm font-semibold rounded-md bg-accent text-primary hover:brightness-95 hover:scale-[1.01] active:scale-[0.98] transition-all duration-150 cursor-pointer"
         >
           View Product
@@ -92,11 +92,11 @@ function HighlightCard({ product }) {
 }
 
 function MiniCard({ product }) {
-  const { name, price, originalPrice, image, badge, routeCategory, id } = product;
+  const { name, price, originalPrice, image, badge, routeCategory, id, slug } = product;
   const useCase = USE_CASE_MAP[routeCategory] || "Top Rated";
   return (
     <Link
-      href={`/products/${id}`}
+      href={`/products/${slug ?? id}`}
       className="group flex gap-3 bg-white rounded-xl p-3 shadow-sm hover:shadow-md hover:scale-[1.02] transition-all duration-300"
     >
       <div className="relative w-20 h-20 flex-shrink-0 rounded-lg overflow-hidden bg-gray-50">
@@ -132,10 +132,10 @@ function MiniCard({ product }) {
   );
 }
 
-export default function FeaturedEssentials() {
-  const topByViews = getTopProducts(5);
-  const highlight  = topByViews[0];
-  const miniItems  = topByViews.slice(1, 5);
+export default async function FeaturedEssentials() {
+  const picks     = await fetchEssentialProducts(5);
+  const highlight = picks[0];
+  const miniItems = picks.slice(1, 5);
 
   if (!highlight) return null;
 

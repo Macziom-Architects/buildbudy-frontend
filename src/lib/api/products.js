@@ -188,6 +188,51 @@ export async function fetchProducts(filters = {}) {
   return { products, total: products.length };
 }
 
+/**
+ * Homepage "Featured Products": curated picks (products.is_featured, set by
+ * migration/merchandising) from the live catalog. Falls back to the mock
+ * selection if the API is unreachable or nothing is flagged yet.
+ */
+export async function fetchFeaturedProducts(limit = 8) {
+  if (USE_MOCK) {
+    await delay(MOCK_DELAY_MS);
+    return getDiverseFeaturedProducts(limit, 2);
+  }
+  try {
+    const res = await apiGet("/products", { city: "delhi-ncr", featured: "true", limit });
+    const products = (res?.products ?? [])
+      .map(mapApiListProduct)
+      .filter((p) => p.inStock && p.image);
+    return products.length ? products : getDiverseFeaturedProducts(limit, 2);
+  } catch {
+    return getDiverseFeaturedProducts(limit, 2);
+  }
+}
+
+/**
+ * Homepage "Featured Essentials": recent in-stock catalog picks that aren't
+ * already in the Featured section (no view/sales data yet to rank by).
+ */
+export async function fetchEssentialProducts(n = 5) {
+  if (USE_MOCK) {
+    await delay(MOCK_DELAY_MS);
+    return getTopProducts(n);
+  }
+  try {
+    const [{ products }, featured] = await Promise.all([
+      fetchProducts({ limit: 40 }),
+      fetchFeaturedProducts(),
+    ]);
+    const featuredIds = new Set(featured.map((p) => p.id));
+    const picks = products
+      .filter((p) => p.inStock && p.image && !featuredIds.has(p.id))
+      .slice(0, n);
+    return picks.length ? picks : getTopProducts(n);
+  } catch {
+    return getTopProducts(n);
+  }
+}
+
 export async function fetchProductBySlug(slug) {
   if (USE_MOCK) {
     await delay(MOCK_DELAY_MS);

@@ -42,7 +42,7 @@ const BADGE_STYLE = {
 };
 
 export default function ProductCard({ product }) {
-  const { addToCart, showToast } = useCart();
+  const { addToCart } = useCart();
   const { isWishlisted, toggleWishlist } = useWishlist();
 
   const price         = product.price ?? 0;
@@ -165,10 +165,8 @@ export default function ProductCard({ product }) {
           type="button"
           onClick={(e) => {
             e.preventDefault();
-            if (product.inStock) {
-              addToCart(product, 1);
-              showToast(`${product.name.split(" ").slice(0, 4).join(" ")} added`);
-            }
+            // CartContext toasts success/failure itself.
+            if (product.inStock) addToCart(product, 1);
           }}
           disabled={!product.inStock}
           className="relative z-30 mt-1 flex w-full cursor-pointer items-center justify-center gap-1.5 rounded-xl bg-accent px-3 py-2 text-[12px] font-bold text-primary transition-all duration-150 hover:bg-accent/90 hover:shadow-sm active:scale-[0.97] disabled:cursor-not-allowed disabled:opacity-40"
