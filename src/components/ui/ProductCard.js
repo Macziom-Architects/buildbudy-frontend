@@ -100,11 +100,11 @@ export default function ProductCard({
         {/* Price row */}
         <div className="flex items-baseline gap-2">
           <span className="text-base font-bold text-primary">
-            ₹{price.toLocaleString("en-IN")}
+            ₹{price.toLocaleString("en-IN", { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
           </span>
           {originalPrice && (
             <span className="text-xs text-muted line-through">
-              ₹{originalPrice.toLocaleString("en-IN")}
+              ₹{originalPrice.toLocaleString("en-IN", { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
             </span>
           )}
         </div>

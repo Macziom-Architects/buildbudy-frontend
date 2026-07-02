@@ -189,13 +189,13 @@ export default async function ProductDetailsPage({ params }) {
               <div className="flex items-baseline gap-1">
                 <span className="text-sm font-medium text-gray-500 leading-none">₹</span>
                 <span className="text-3xl font-bold leading-none text-primary">
-                  {product.price.toLocaleString("en-IN")}
+                  {product.price.toLocaleString("en-IN", { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
                 </span>
               </div>
               {originalPrice > product.price && (
                 <div className="flex items-center gap-2 pb-0.5">
                   <span className="text-sm text-gray-400 line-through">
-                    ₹{originalPrice.toLocaleString("en-IN")}
+                    ₹{originalPrice.toLocaleString("en-IN", { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
                   </span>
                   <span className="rounded-md bg-red-50 px-2 py-0.5 text-xs font-bold text-red-600">
                     {discount}% off
@@ -413,11 +413,11 @@ export default async function ProductDetailsPage({ params }) {
                     </h3>
                     <div className="mt-auto flex items-baseline gap-1.5 pt-1">
                       <span className="text-base font-bold text-primary">
-                        ₹{item.price.toLocaleString("en-IN")}
+                        ₹{item.price.toLocaleString("en-IN", { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
                       </span>
                       {itemOriginal > item.price && (
                         <span className="text-xs text-gray-400 line-through">
-                          ₹{itemOriginal.toLocaleString("en-IN")}
+                          ₹{itemOriginal.toLocaleString("en-IN", { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
                         </span>
                       )}
                     </div>

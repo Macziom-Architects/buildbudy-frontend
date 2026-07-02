@@ -9,7 +9,7 @@ import Footer from "@/components/layout/Footer";
 import { getOrderById } from "@/lib/api/orders";
 
 function formatPrice(p) {
-  return `₹${(p ?? 0).toLocaleString("en-IN")}`;
+  return `₹${(p ?? 0).toLocaleString("en-IN", { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`;
 }
 
 function deliveryEstimate() {

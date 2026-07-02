@@ -71,11 +71,11 @@ function HighlightCard({ product }) {
         </p>
         <div className="flex items-baseline gap-2 pt-1 mt-auto">
           <span className="text-lg font-bold text-primary">
-            ₹{price.toLocaleString("en-IN")}
+            ₹{price.toLocaleString("en-IN", { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
           </span>
           {originalPrice > price && (
             <span className="text-sm text-muted line-through">
-              ₹{originalPrice.toLocaleString("en-IN")}
+              ₹{originalPrice.toLocaleString("en-IN", { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
             </span>
           )}
         </div>
@@ -122,9 +122,9 @@ function MiniCard({ product }) {
           {useCase}
         </p>
         <div className="flex items-baseline gap-1.5">
-          <span className="text-sm font-bold text-primary">₹{price.toLocaleString("en-IN")}</span>
+          <span className="text-sm font-bold text-primary">₹{price.toLocaleString("en-IN", { minimumFractionDigits: 2, maximumFractionDigits: 2 })}</span>
           {originalPrice && originalPrice > price && (
-            <span className="text-[11px] text-muted line-through">₹{originalPrice.toLocaleString("en-IN")}</span>
+            <span className="text-[11px] text-muted line-through">₹{originalPrice.toLocaleString("en-IN", { minimumFractionDigits: 2, maximumFractionDigits: 2 })}</span>
           )}
         </div>
       </div>

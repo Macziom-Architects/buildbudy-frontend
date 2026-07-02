@@ -69,7 +69,7 @@ function SpecialistCard({ specialist, serviceId, startingFrom }) {
       <div className="flex items-center justify-between pt-3 border-t border-gray-100">
         <div>
           <p className="text-[10px] text-muted uppercase tracking-wide">Starting from</p>
-          <p className="text-base font-bold text-primary">₹{effectivePrice.toLocaleString("en-IN")}</p>
+          <p className="text-base font-bold text-primary">₹{effectivePrice.toLocaleString("en-IN", { minimumFractionDigits: 2, maximumFractionDigits: 2 })}</p>
         </div>
         <Link
           href={`/services/book?type=${serviceId}`}
@@ -205,7 +205,7 @@ export default function ServiceSlugPage() {
                 </span>
                 <span className="flex items-center gap-1.5 text-sm">
                   <Users className="h-4 w-4 text-accent"/>
-                  <span className="font-bold text-white">{service.totalJobs.toLocaleString("en-IN")}+</span>
+                  <span className="font-bold text-white">{service.totalJobs.toLocaleString("en-IN", { minimumFractionDigits: 2, maximumFractionDigits: 2 })}+</span>
                   <span className="text-white/50">jobs done</span>
                 </span>
                 <span className="flex items-center gap-1.5 text-sm">
@@ -289,7 +289,7 @@ export default function ServiceSlugPage() {
                 </p>
                 <div className="flex items-baseline gap-1 mb-1">
                   <span className={`text-2xl font-bold ${tier.popular ? "text-white" : "text-primary"}`}>
-                    ₹{tier.price.toLocaleString("en-IN")}
+                    ₹{tier.price.toLocaleString("en-IN", { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
                   </span>
                   {(tier.priceUnit ?? service.priceUnit) && (
                     <span className={`text-xs ${tier.popular ? "text-white/60" : "text-muted"}`}>
@@ -440,7 +440,7 @@ export default function ServiceSlugPage() {
           <div>
             <p className="text-xs font-bold uppercase tracking-widest text-accent mb-1">Ready to book?</p>
             <h3 className="text-xl font-bold text-white">Get a {service.name} Professional Today</h3>
-            <p className="text-sm text-white/60 mt-1">Starting from ₹{service.startingFrom.toLocaleString("en-IN")}{service.priceUnit} · Same-day slots available</p>
+            <p className="text-sm text-white/60 mt-1">Starting from ₹{service.startingFrom.toLocaleString("en-IN", { minimumFractionDigits: 2, maximumFractionDigits: 2 })}{service.priceUnit} · Same-day slots available</p>
           </div>
           <Link
             href={`/services/book?type=${service.id}`}

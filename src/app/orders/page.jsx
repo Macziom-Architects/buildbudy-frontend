@@ -82,7 +82,7 @@ function OrderCard({ order }) {
 
       {/* Right side */}
       <div className="flex sm:flex-col items-center sm:items-end justify-between sm:justify-center gap-3 flex-shrink-0">
-        <p className="text-base font-bold text-primary">₹{order.total.toLocaleString("en-IN")}</p>
+        <p className="text-base font-bold text-primary">₹{order.total.toLocaleString("en-IN", { minimumFractionDigits: 2, maximumFractionDigits: 2 })}</p>
         <div className="flex items-center gap-1.5">
           <span className="hidden sm:block text-xs font-medium text-muted group-hover:text-accent transition-colors">Details</span>
           <ChevronRight className="h-4 w-4 text-gray-400 group-hover:text-primary transition-colors" />

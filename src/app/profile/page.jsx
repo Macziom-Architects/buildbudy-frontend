@@ -235,7 +235,7 @@ function OrdersSection({ orders, loading }) {
                     </p>
                   </div>
                   <div className="flex items-center gap-2 flex-shrink-0">
-                    <span className="text-sm font-bold text-primary">₹{order.total.toLocaleString("en-IN")}</span>
+                    <span className="text-sm font-bold text-primary">₹{order.total.toLocaleString("en-IN", { minimumFractionDigits: 2, maximumFractionDigits: 2 })}</span>
                     <ChevronRight className="h-4 w-4 text-gray-400 group-hover:text-primary transition-colors" />
                   </div>
                 </Link>
@@ -319,7 +319,7 @@ function WishlistSection() {
             </div>
             <div className="flex-1 min-w-0">
               <p className="text-xs font-semibold text-primary leading-snug truncate">{product.name}</p>
-              <p className="text-sm font-bold text-primary mt-0.5">₹{(product.price ?? 0).toLocaleString("en-IN")}</p>
+              <p className="text-sm font-bold text-primary mt-0.5">₹{(product.price ?? 0).toLocaleString("en-IN", { minimumFractionDigits: 2, maximumFractionDigits: 2 })}</p>
             </div>
             <button
               onClick={() => handleMoveToCart(product)}

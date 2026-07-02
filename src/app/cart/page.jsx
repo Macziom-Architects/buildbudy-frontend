@@ -14,7 +14,7 @@ import { getProducts } from "@/lib/products";
 const recommended = getProducts().slice(0, 4);
 
 function formatPrice(price) {
-  return `₹${price.toLocaleString("en-IN", { maximumFractionDigits: 2 })}`;
+  return `₹${price.toLocaleString("en-IN", { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`;
 }
 
 export default function CartPage() {
@@ -173,13 +173,6 @@ export default function CartPage() {
 
                 <div className="mt-3 space-y-2.5 text-sm">
                   <div className="flex justify-between items-center">
-                    <span className="text-gray-400">
-                      Subtotal ({cartItems.reduce((s, i) => s + i.quantity, 0)} items)
-                    </span>
-                    <span className="font-medium">{formatPrice(subtotal)}</span>
-                  </div>
-
-                  <div className="flex justify-between items-center">
                     <span className="text-gray-400 flex items-center gap-1.5">
                       <Truck className="h-3 w-3" />
                       Delivery
@@ -188,7 +181,7 @@ export default function CartPage() {
                   </div>
 
                   <div className="border-t border-white/10 pt-3 flex justify-between items-center font-bold text-base">
-                    <span>Subtotal</span>
+                    <span>Subtotal ({cartItems.reduce((s, i) => s + i.quantity, 0)} items)</span>
                     <span className="text-accent text-lg">{formatPrice(subtotal)}</span>
                   </div>
                 </div>

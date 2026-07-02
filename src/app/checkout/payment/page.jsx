@@ -5,7 +5,7 @@ import { useRouter } from "next/navigation";
 import { useCart } from "@/context/CartContext";
 
 function formatPrice(p) {
-  return `₹${p.toLocaleString("en-IN")}`;
+  return `₹${p.toLocaleString("en-IN", { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`;
 }
 
 const METHODS = [

@@ -120,7 +120,7 @@ function ItemsList({ items }) {
               <p className="text-xs text-muted">Qty: {item.qty}</p>
             </div>
             <p className="text-sm font-bold text-primary flex-shrink-0">
-              ₹{(item.price * item.qty).toLocaleString("en-IN")}
+              ₹{(item.price * item.qty).toLocaleString("en-IN", { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
             </p>
           </div>
         ))}
@@ -137,12 +137,12 @@ function PaymentSummary({ order }) {
       <div className="space-y-2.5">
         <div className="flex justify-between text-sm">
           <span className="text-muted">Subtotal</span>
-          <span className="font-medium">₹{order.subtotal.toLocaleString("en-IN")}</span>
+          <span className="font-medium">₹{order.subtotal.toLocaleString("en-IN", { minimumFractionDigits: 2, maximumFractionDigits: 2 })}</span>
         </div>
         {order.gst > 0 && (
           <div className="flex justify-between text-sm">
             <span className="text-muted">GST</span>
-            <span className="font-medium">₹{order.gst.toLocaleString("en-IN")}</span>
+            <span className="font-medium">₹{order.gst.toLocaleString("en-IN", { minimumFractionDigits: 2, maximumFractionDigits: 2 })}</span>
           </div>
         )}
         <div className="flex justify-between text-sm">
@@ -154,12 +154,12 @@ function PaymentSummary({ order }) {
         {order.discount > 0 && (
           <div className="flex justify-between text-sm">
             <span className="text-muted">Coupon{order.coupon ? ` (${order.coupon})` : ""}</span>
-            <span className="text-emerald-600 font-medium">−₹{order.discount.toLocaleString("en-IN")}</span>
+            <span className="text-emerald-600 font-medium">−₹{order.discount.toLocaleString("en-IN", { minimumFractionDigits: 2, maximumFractionDigits: 2 })}</span>
           </div>
         )}
         <div className="pt-2.5 border-t border-gray-100 flex justify-between">
           <span className="text-sm font-bold text-primary">Total Paid</span>
-          <span className="text-base font-bold text-primary">₹{order.total.toLocaleString("en-IN")}</span>
+          <span className="text-base font-bold text-primary">₹{order.total.toLocaleString("en-IN", { minimumFractionDigits: 2, maximumFractionDigits: 2 })}</span>
         </div>
         <div className="flex items-center gap-2 pt-1">
           <CreditCard className="h-3.5 w-3.5 text-muted flex-shrink-0" />

@@ -211,7 +211,7 @@ function ProductsContent() {
             <p className="mt-1 text-sm text-muted">
               {sorted.length === 0
                 ? "No products found"
-                : `${sorted.length.toLocaleString("en-IN")} product${sorted.length === 1 ? "" : "s"}`}
+                : `${sorted.length.toLocaleString("en-IN", { minimumFractionDigits: 2, maximumFractionDigits: 2 })} product${sorted.length === 1 ? "" : "s"}`}
             </p>
           </div>
 

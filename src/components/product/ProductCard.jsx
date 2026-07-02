@@ -144,11 +144,11 @@ export default function ProductCard({ product }) {
           <div className="flex items-baseline gap-1.5">
             <span className="text-[11px] font-medium text-gray-500 leading-none">₹</span>
             <span className="text-base font-bold leading-none text-gray-900">
-              {price.toLocaleString("en-IN")}
+              {price.toLocaleString("en-IN", { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
             </span>
             {originalPrice > price && (
               <span className="text-xs text-gray-400 line-through">
-                ₹{originalPrice.toLocaleString("en-IN")}
+                ₹{originalPrice.toLocaleString("en-IN", { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
               </span>
             )}
           </div>

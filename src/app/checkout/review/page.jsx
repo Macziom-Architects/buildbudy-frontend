@@ -9,7 +9,7 @@ import { checkoutCart } from "@/lib/api/cart";
 import { loadRazorpay, verifyPayment } from "@/lib/api/payments";
 
 function formatPrice(p) {
-  return `₹${(p ?? 0).toLocaleString("en-IN", { maximumFractionDigits: 2 })}`;
+  return `₹${(p ?? 0).toLocaleString("en-IN", { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`;
 }
 
 const STEPS = [
@@ -155,10 +155,6 @@ export default function ReviewPage() {
             <div className="bg-[#0F1E25] text-white p-5 rounded-lg shadow-md">
               <h2 className="font-bold text-base tracking-wide uppercase border-b border-white/10 pb-3">Order Summary</h2>
               <div className="mt-3 space-y-2.5 text-sm">
-                <div className="flex justify-between items-center">
-                  <span className="text-gray-400">Subtotal</span>
-                  <span className="font-medium">{formatPrice(subtotal)}</span>
-                </div>
                 <div className="border-t border-white/10 pt-3 flex justify-between items-center font-bold text-base">
                   <span>Subtotal</span>
                   <span className="text-accent text-lg">{formatPrice(subtotal)}</span>

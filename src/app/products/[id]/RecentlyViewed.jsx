@@ -80,11 +80,11 @@ export default function RecentlyViewed({ currentProductId }) {
                 </h3>
                 <div className="mt-auto flex items-baseline gap-1.5 pt-1">
                   <span className="text-base font-bold text-primary">
-                    ₹{item.price.toLocaleString("en-IN")}
+                    ₹{item.price.toLocaleString("en-IN", { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
                   </span>
                   {originalPrice > item.price && (
                     <span className="text-xs text-gray-400 line-through">
-                      ₹{originalPrice.toLocaleString("en-IN")}
+                      ₹{originalPrice.toLocaleString("en-IN", { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
                     </span>
                   )}
                 </div>
