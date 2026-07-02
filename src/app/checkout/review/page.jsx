@@ -39,8 +39,8 @@ export default function ReviewPage() {
     setError("");
     try {
       const order = await checkoutCart(address.id);
-      // Backend clears the cart as part of checkout; reflect that in the UI.
-      refreshCart();
+      // The backend keeps the cart until the payment is confirmed, so a
+      // dismissed widget can retry checkout with the cart intact.
 
       const Razorpay = await loadRazorpay();
       const rzp = new Razorpay({
@@ -59,6 +59,8 @@ export default function ReviewPage() {
               razorpaySignature: response.razorpay_signature,
             });
             sessionStorage.removeItem("bb_checkout_addr");
+            // Payment confirmed — the backend cleared the cart; sync the badge.
+            refreshCart();
             router.push(`/order/success?orderId=${order.orderId}`);
           } catch {
             setError(`Payment went through but we couldn't confirm it. Contact support with order ${order.orderNumber}.`);
