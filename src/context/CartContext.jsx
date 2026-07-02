@@ -37,6 +37,8 @@ function normalize(items) {
     name: it.productName,
     slug: it.productSlug,
     price: (it.pricePaise ?? 0) / 100,
+    pricePaise: it.pricePaise ?? 0,
+    gstRatePct: it.gstRatePct ?? 0,
     image: it.primaryImageUrl || null,
     quantity: it.quantity,
     availableStock: it.availableStock,

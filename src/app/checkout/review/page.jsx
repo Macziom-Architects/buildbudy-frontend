@@ -9,7 +9,7 @@ import { checkoutCart } from "@/lib/api/cart";
 import { loadRazorpay, verifyPayment } from "@/lib/api/payments";
 
 function formatPrice(p) {
-  return `₹${(p ?? 0).toLocaleString("en-IN")}`;
+  return `₹${(p ?? 0).toLocaleString("en-IN", { maximumFractionDigits: 2 })}`;
 }
 
 const STEPS = [
@@ -32,6 +32,13 @@ export default function ReviewPage() {
   }, [router]);
 
   const subtotal = cartItems.reduce((s, i) => s + i.price * i.quantity, 0);
+  // Same paise math as the backend (per line, CGST/SGST truncated separately).
+  const gstPaise = cartItems.reduce((s, i) => {
+    const linePaise = (i.pricePaise ?? Math.round(i.price * 100)) * i.quantity;
+    return s + Math.floor((linePaise * ((i.gstRatePct ?? 0) / 2)) / 100) * 2;
+  }, 0);
+  const gstTotal = gstPaise / 100;
+  const total = subtotal + gstTotal;
 
   async function handlePlaceOrder() {
     if (!address) return;
@@ -157,12 +164,12 @@ export default function ReviewPage() {
                   <span className="font-medium">{formatPrice(subtotal)}</span>
                 </div>
                 <div className="flex justify-between items-center">
-                  <span className="text-gray-400">GST &amp; total</span>
-                  <span className="text-gray-300 text-xs">calculated at payment</span>
+                  <span className="text-gray-400">GST</span>
+                  <span className="font-medium">{formatPrice(gstTotal)}</span>
                 </div>
                 <div className="border-t border-white/10 pt-3 flex justify-between items-center font-bold text-base">
                   <span>Payable</span>
-                  <span className="text-accent text-lg">{formatPrice(subtotal)}+</span>
+                  <span className="text-accent text-lg">{formatPrice(total)}</span>
                 </div>
               </div>
               <div className="mt-4 text-xs text-gray-500 space-y-1.5">
