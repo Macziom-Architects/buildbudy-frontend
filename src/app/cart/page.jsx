@@ -33,17 +33,13 @@ export default function CartPage() {
   }
 
   // The backend is the source of truth for pricing (no client-side
-  // discounts/coupons — it has no coupon support yet). GST is computed from
-  // the per-item rate the cart API returns, so the total matches checkout.
+  // discounts/coupons — it has no coupon support yet).
+  // TODO(founder decision): taxes are intentionally NOT shown. Catalog prices
+  // are scraped retail prices (likely MRP = GST-inclusive) but the backend
+  // currently adds GST on top at checkout — possibly double taxation. Until
+  // the founders settle inclusive-vs-exclusive pricing, the summary shows the
+  // subtotal only.
   const subtotal = cartItems.reduce((sum, item) => sum + item.price * item.quantity, 0);
-  // Mirror the backend's paise math (per line: CGST and SGST truncated
-  // separately) so the shown total matches the charged amount to the paisa.
-  const gstPaise = cartItems.reduce((sum, item) => {
-    const linePaise = (item.pricePaise ?? Math.round(item.price * 100)) * item.quantity;
-    return sum + Math.floor((linePaise * ((item.gstRatePct ?? 0) / 2)) / 100) * 2;
-  }, 0);
-  const gstTotal = gstPaise / 100;
-  const total = subtotal + gstTotal;
 
   return (
     <>
@@ -184,11 +180,6 @@ export default function CartPage() {
                   </div>
 
                   <div className="flex justify-between items-center">
-                    <span className="text-gray-400">GST</span>
-                    <span className="font-medium">{formatPrice(gstTotal)}</span>
-                  </div>
-
-                  <div className="flex justify-between items-center">
                     <span className="text-gray-400 flex items-center gap-1.5">
                       <Truck className="h-3 w-3" />
                       Delivery
@@ -197,8 +188,8 @@ export default function CartPage() {
                   </div>
 
                   <div className="border-t border-white/10 pt-3 flex justify-between items-center font-bold text-base">
-                    <span>Total</span>
-                    <span className="text-accent text-lg">{formatPrice(total)}</span>
+                    <span>Subtotal</span>
+                    <span className="text-accent text-lg">{formatPrice(subtotal)}</span>
                   </div>
                 </div>
 

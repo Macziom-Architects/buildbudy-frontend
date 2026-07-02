@@ -31,14 +31,10 @@ export default function ReviewPage() {
     setAddress(JSON.parse(raw));
   }, [router]);
 
+  // TODO(founder decision): no tax shown — see the note in cart/page.jsx
+  // (inclusive-vs-exclusive pricing unresolved; backend currently adds GST
+  // on top at checkout, so the charged amount may exceed this subtotal).
   const subtotal = cartItems.reduce((s, i) => s + i.price * i.quantity, 0);
-  // Same paise math as the backend (per line, CGST/SGST truncated separately).
-  const gstPaise = cartItems.reduce((s, i) => {
-    const linePaise = (i.pricePaise ?? Math.round(i.price * 100)) * i.quantity;
-    return s + Math.floor((linePaise * ((i.gstRatePct ?? 0) / 2)) / 100) * 2;
-  }, 0);
-  const gstTotal = gstPaise / 100;
-  const total = subtotal + gstTotal;
 
   async function handlePlaceOrder() {
     if (!address) return;
@@ -163,13 +159,9 @@ export default function ReviewPage() {
                   <span className="text-gray-400">Subtotal</span>
                   <span className="font-medium">{formatPrice(subtotal)}</span>
                 </div>
-                <div className="flex justify-between items-center">
-                  <span className="text-gray-400">GST</span>
-                  <span className="font-medium">{formatPrice(gstTotal)}</span>
-                </div>
                 <div className="border-t border-white/10 pt-3 flex justify-between items-center font-bold text-base">
-                  <span>Payable</span>
-                  <span className="text-accent text-lg">{formatPrice(total)}</span>
+                  <span>Subtotal</span>
+                  <span className="text-accent text-lg">{formatPrice(subtotal)}</span>
                 </div>
               </div>
               <div className="mt-4 text-xs text-gray-500 space-y-1.5">
