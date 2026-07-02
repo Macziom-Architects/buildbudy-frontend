@@ -131,25 +131,29 @@ export function CartProvider({ children }) {
     };
   }, [refreshCart]);
 
+  // Returns true when the item landed in the cart, so callers can decide
+  // whether to navigate (e.g. detail page pushes to /cart only on success).
   const addToCart = useCallback(async (product, quantity = 1) => {
     if (!isLoggedIn()) {
       showToast("Please log in to add items to your cart", "error");
       router.push("/auth/login");
-      return;
+      return false;
     }
     const supplierProductId = product?.supplierProductId;
     if (!supplierProductId) {
       // Mock catalog products don't carry a supplier listing id yet — this works
       // once products are served from the DB.
       showToast("This product isn't available for ordering yet", "error");
-      return;
+      return false;
     }
     try {
       const items = await cartApi.addToCart(supplierProductId, Math.max(1, Number(quantity) || 1));
       setCartItems(normalize(items));
       showToast("Added to cart");
+      return true;
     } catch (err) {
       showToast(err?.message || "Could not add to cart", "error");
+      return false;
     }
   }, [router, showToast]);
 

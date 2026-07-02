@@ -24,15 +24,13 @@ export default function ProductActions({ product, priceText }) {
   const dec = () => setQuantity((q) => Math.max(1, q - 1));
   const inc = () => setQuantity((q) => q + 1);
 
-  const handleAddToCart = () => {
-    addToCart(product, quantity);
-    showToast(`${product.name.split(" ").slice(0, 3).join(" ")} added to cart`);
-    router.push("/cart");
+  // CartContext toasts success/failure itself; only navigate once the item
+  // actually landed in the cart (a failed add otherwise pushes to /cart, and
+  // the logged-out redirect to /auth/login would be overridden).
+  const handleAddToCart = async () => {
+    if (await addToCart(product, quantity)) router.push("/cart");
   };
-  const handleBuyNow = () => {
-    addToCart(product, quantity);
-    router.push("/cart");
-  };
+  const handleBuyNow = handleAddToCart;
 
   const handleWishlist = () => {
     toggleWishlist(product);
