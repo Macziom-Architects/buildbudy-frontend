@@ -187,9 +187,17 @@ export function CartProvider({ children }) {
     }
   }, [showToast]);
 
+  // Quantity of a listing already in the cart (0 when absent) — lets product
+  // surfaces swap the Add-to-Cart button for a +/- stepper.
+  const getQuantity = useCallback(
+    (supplierProductId) =>
+      cartItems.find((i) => i.id === supplierProductId)?.quantity ?? 0,
+    [cartItems],
+  );
+
   const value = useMemo(
-    () => ({ cartItems, loading, addToCart, removeFromCart, updateQuantity, clearCart, showToast, refreshCart }),
-    [cartItems, loading, addToCart, removeFromCart, updateQuantity, clearCart, showToast, refreshCart],
+    () => ({ cartItems, loading, addToCart, removeFromCart, updateQuantity, clearCart, showToast, refreshCart, getQuantity }),
+    [cartItems, loading, addToCart, removeFromCart, updateQuantity, clearCart, showToast, refreshCart, getQuantity],
   );
 
   return (

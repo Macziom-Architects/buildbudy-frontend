@@ -2,7 +2,7 @@
 
 import Image from "next/image";
 import Link from "next/link";
-import { Heart, ShoppingCart } from "lucide-react";
+import { Heart, ShoppingCart, Minus, Plus } from "lucide-react";
 import { useCart } from "@/context/CartContext";
 import { useWishlist } from "@/context/WishlistContext";
 
@@ -42,7 +42,8 @@ const BADGE_STYLE = {
 };
 
 export default function ProductCard({ product }) {
-  const { addToCart } = useCart();
+  const { addToCart, updateQuantity, getQuantity } = useCart();
+  const inCartQty = getQuantity(product.supplierProductId);
   const { isWishlisted, toggleWishlist } = useWishlist();
 
   const price         = product.price ?? 0;
@@ -160,20 +161,42 @@ export default function ProductCard({ product }) {
           )}
         </div>
 
-        {/* Add to Cart */}
-        <button
-          type="button"
-          onClick={(e) => {
-            e.preventDefault();
-            // CartContext toasts success/failure itself.
-            if (product.inStock) addToCart(product, 1);
-          }}
-          disabled={!product.inStock}
-          className="relative z-30 mt-1 flex w-full cursor-pointer items-center justify-center gap-1.5 rounded-xl bg-accent px-3 py-2 text-[12px] font-bold text-primary transition-all duration-150 hover:bg-accent/90 hover:shadow-sm active:scale-[0.97] disabled:cursor-not-allowed disabled:opacity-40"
-        >
-          <ShoppingCart className="h-3.5 w-3.5" />
-          Add to Cart
-        </button>
+        {/* Add to Cart — becomes a quantity stepper once the item is in the cart */}
+        {inCartQty > 0 ? (
+          <div className="relative z-30 mt-1 flex w-full items-center justify-between rounded-xl border border-accent bg-accent/10 px-1 py-0.5">
+            <button
+              type="button"
+              onClick={(e) => { e.preventDefault(); updateQuantity(product.supplierProductId, inCartQty - 1); }}
+              className="flex h-7 w-8 cursor-pointer items-center justify-center rounded-lg text-primary transition hover:bg-accent/30 active:scale-95"
+              aria-label="Decrease quantity"
+            >
+              <Minus className="h-3.5 w-3.5" />
+            </button>
+            <span className="text-[12px] font-bold text-primary">{inCartQty} in cart</span>
+            <button
+              type="button"
+              onClick={(e) => { e.preventDefault(); updateQuantity(product.supplierProductId, inCartQty + 1); }}
+              className="flex h-7 w-8 cursor-pointer items-center justify-center rounded-lg text-primary transition hover:bg-accent/30 active:scale-95"
+              aria-label="Increase quantity"
+            >
+              <Plus className="h-3.5 w-3.5" />
+            </button>
+          </div>
+        ) : (
+          <button
+            type="button"
+            onClick={(e) => {
+              e.preventDefault();
+              // CartContext toasts success/failure itself.
+              if (product.inStock) addToCart(product, 1);
+            }}
+            disabled={!product.inStock}
+            className="relative z-30 mt-1 flex w-full cursor-pointer items-center justify-center gap-1.5 rounded-xl bg-accent px-3 py-2 text-[12px] font-bold text-primary transition-all duration-150 hover:bg-accent/90 hover:shadow-sm active:scale-[0.97] disabled:cursor-not-allowed disabled:opacity-40"
+          >
+            <ShoppingCart className="h-3.5 w-3.5" />
+            Add to Cart
+          </button>
+        )}
       </div>
     </article>
   );

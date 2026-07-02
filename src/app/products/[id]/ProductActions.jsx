@@ -11,7 +11,8 @@ import { useRouter } from "next/navigation";
 
 export default function ProductActions({ product, priceText }) {
   const [quantity, setQuantity] = useState(1);
-  const { addToCart, showToast } = useCart();
+  const { addToCart, updateQuantity, getQuantity, showToast } = useCart();
+  const inCartQty = getQuantity(product.supplierProductId);
   const { isWishlisted, toggleWishlist } = useWishlist();
   const router = useRouter();
 
@@ -30,7 +31,10 @@ export default function ProductActions({ product, priceText }) {
   const handleAddToCart = async () => {
     if (await addToCart(product, quantity)) router.push("/cart");
   };
-  const handleBuyNow = handleAddToCart;
+  const handleBuyNow = async () => {
+    if (inCartQty > 0) return router.push("/cart");
+    return handleAddToCart();
+  };
 
   const handleWishlist = () => {
     toggleWishlist(product);
@@ -63,7 +67,10 @@ export default function ProductActions({ product, priceText }) {
   return (
     <>
       {/* ── Quantity + stock status ─────────────────────────────────── */}
+      {/* The pre-add quantity picker is hidden once the item is in the cart —
+          the Add-to-Cart slot becomes the cart-backed stepper instead. */}
       <div className="mt-5 flex flex-wrap items-center gap-4">
+        {inCartQty === 0 && (
         <div className="flex items-center overflow-hidden rounded-xl border border-gray-200 bg-white shadow-sm">
           <button
             type="button"
@@ -86,6 +93,7 @@ export default function ProductActions({ product, priceText }) {
             <Plus className="h-3.5 w-3.5" />
           </button>
         </div>
+        )}
 
         <div className={`flex items-center gap-2 text-sm font-semibold ${product.inStock ? "text-emerald-600" : "text-red-500"}`}>
           <span className={`h-2 w-2 rounded-full ${product.inStock ? "bg-emerald-500" : "bg-red-500"} shadow-[0_0_0_3px] ${product.inStock ? "shadow-emerald-100" : "shadow-red-100"}`} />
@@ -95,15 +103,37 @@ export default function ProductActions({ product, priceText }) {
 
       {/* ── Action buttons ──────────────────────────────────────────── */}
       <div className="mt-4 grid grid-cols-1 gap-2.5 sm:grid-cols-2">
-        <button
-          type="button"
-          onClick={handleAddToCart}
-          disabled={!product.inStock}
-          className="flex h-11 cursor-pointer items-center justify-center gap-2 rounded-xl bg-accent px-5 text-sm font-bold text-primary shadow-sm transition hover:bg-accent/90 hover:shadow-md active:scale-[0.98] disabled:cursor-not-allowed disabled:opacity-50"
-        >
-          <ShoppingCart className="h-4 w-4" />
-          Add to Cart
-        </button>
+        {inCartQty > 0 ? (
+          <div className="flex h-11 items-center justify-between rounded-xl border-2 border-accent bg-accent/10 px-1.5">
+            <button
+              type="button"
+              onClick={() => updateQuantity(product.supplierProductId, inCartQty - 1)}
+              className="flex h-8 w-10 cursor-pointer items-center justify-center rounded-lg text-primary transition hover:bg-accent/30 active:scale-95"
+              aria-label="Decrease quantity"
+            >
+              <Minus className="h-4 w-4" />
+            </button>
+            <span className="text-sm font-bold text-primary">{inCartQty} in cart</span>
+            <button
+              type="button"
+              onClick={() => updateQuantity(product.supplierProductId, inCartQty + 1)}
+              className="flex h-8 w-10 cursor-pointer items-center justify-center rounded-lg text-primary transition hover:bg-accent/30 active:scale-95"
+              aria-label="Increase quantity"
+            >
+              <Plus className="h-4 w-4" />
+            </button>
+          </div>
+        ) : (
+          <button
+            type="button"
+            onClick={handleAddToCart}
+            disabled={!product.inStock}
+            className="flex h-11 cursor-pointer items-center justify-center gap-2 rounded-xl bg-accent px-5 text-sm font-bold text-primary shadow-sm transition hover:bg-accent/90 hover:shadow-md active:scale-[0.98] disabled:cursor-not-allowed disabled:opacity-50"
+          >
+            <ShoppingCart className="h-4 w-4" />
+            Add to Cart
+          </button>
+        )}
 
         <button
           type="button"
@@ -112,7 +142,7 @@ export default function ProductActions({ product, priceText }) {
           className="flex h-11 cursor-pointer items-center justify-center gap-2 rounded-xl bg-primary px-5 text-sm font-bold text-white shadow-sm transition hover:bg-primary/90 hover:shadow-md active:scale-[0.98] disabled:cursor-not-allowed disabled:opacity-50"
         >
           <Zap className="h-4 w-4" />
-          Buy Now
+          {inCartQty > 0 ? "Go to Cart" : "Buy Now"}
         </button>
       </div>
 
@@ -209,24 +239,38 @@ export default function ProductActions({ product, priceText }) {
             >
               <Heart className={`h-4 w-4 ${wishlisted ? "fill-red-500" : ""}`} />
             </button>
-            <div className="flex items-center overflow-hidden rounded-lg border border-gray-200 bg-white">
-              <button type="button" onClick={dec} disabled={quantity <= 1} className="flex h-9 w-9 cursor-pointer items-center justify-center text-gray-500 hover:bg-gray-50 disabled:opacity-40">
-                <Minus className="h-3 w-3" />
-              </button>
-              <span className="flex h-9 w-8 select-none items-center justify-center border-x border-gray-200 text-sm font-bold text-primary">{quantity}</span>
-              <button type="button" onClick={inc} className="flex h-9 w-9 cursor-pointer items-center justify-center text-gray-500 hover:bg-gray-50">
-                <Plus className="h-3 w-3" />
-              </button>
-            </div>
-            <button
-              type="button"
-              onClick={handleAddToCart}
-              disabled={!product.inStock}
-              className="flex h-9 cursor-pointer items-center gap-1.5 rounded-xl bg-accent px-4 text-sm font-bold text-primary transition hover:bg-accent/90 active:scale-95 disabled:opacity-50"
-            >
-              <ShoppingCart className="h-3.5 w-3.5" />
-              Add
-            </button>
+            {inCartQty > 0 ? (
+              <div className="flex items-center overflow-hidden rounded-lg border-2 border-accent bg-accent/10">
+                <button type="button" onClick={() => updateQuantity(product.supplierProductId, inCartQty - 1)} aria-label="Decrease quantity" className="flex h-9 w-9 cursor-pointer items-center justify-center text-primary hover:bg-accent/30">
+                  <Minus className="h-3 w-3" />
+                </button>
+                <span className="flex h-9 min-w-8 select-none items-center justify-center px-1 text-sm font-bold text-primary">{inCartQty}</span>
+                <button type="button" onClick={() => updateQuantity(product.supplierProductId, inCartQty + 1)} aria-label="Increase quantity" className="flex h-9 w-9 cursor-pointer items-center justify-center text-primary hover:bg-accent/30">
+                  <Plus className="h-3 w-3" />
+                </button>
+              </div>
+            ) : (
+              <>
+                <div className="flex items-center overflow-hidden rounded-lg border border-gray-200 bg-white">
+                  <button type="button" onClick={dec} disabled={quantity <= 1} className="flex h-9 w-9 cursor-pointer items-center justify-center text-gray-500 hover:bg-gray-50 disabled:opacity-40">
+                    <Minus className="h-3 w-3" />
+                  </button>
+                  <span className="flex h-9 w-8 select-none items-center justify-center border-x border-gray-200 text-sm font-bold text-primary">{quantity}</span>
+                  <button type="button" onClick={inc} className="flex h-9 w-9 cursor-pointer items-center justify-center text-gray-500 hover:bg-gray-50">
+                    <Plus className="h-3 w-3" />
+                  </button>
+                </div>
+                <button
+                  type="button"
+                  onClick={handleAddToCart}
+                  disabled={!product.inStock}
+                  className="flex h-9 cursor-pointer items-center gap-1.5 rounded-xl bg-accent px-4 text-sm font-bold text-primary transition hover:bg-accent/90 active:scale-95 disabled:opacity-50"
+                >
+                  <ShoppingCart className="h-3.5 w-3.5" />
+                  Add
+                </button>
+              </>
+            )}
           </div>
         </div>
       </div>
