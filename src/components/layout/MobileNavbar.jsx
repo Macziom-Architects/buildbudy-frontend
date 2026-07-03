@@ -8,17 +8,7 @@ import { MdHomeRepairService } from "react-icons/md";
 import { useCart } from "@/context/CartContext";
 import { useWishlist } from "@/context/WishlistContext";
 import { useEffect, useState } from "react";
-
-function getUnreadCount() {
-  try {
-    const raw = typeof window !== "undefined" && localStorage.getItem("bb_notifications");
-    if (!raw) return 5; // default seed unread
-    const list = JSON.parse(raw);
-    return Array.isArray(list) ? list.filter((n) => !n.read).length : 0;
-  } catch {
-    return 0;
-  }
-}
+import { getUnreadCount } from "@/lib/api/notifications";
 
 export default function MobileNavbar() {
   const pathname = usePathname();
@@ -29,10 +19,20 @@ export default function MobileNavbar() {
 
   const [notifCount, setNotifCount] = useState(0);
   useEffect(() => {
-    setNotifCount(getUnreadCount());
-    const handler = () => setNotifCount(getUnreadCount());
+    let cancelled = false;
+    async function fetchCount() {
+      try {
+        const count = await getUnreadCount();
+        if (!cancelled) setNotifCount(count);
+      } catch {}
+    }
+    fetchCount();
+    const handler = () => fetchCount();
     window.addEventListener("storage", handler);
-    return () => window.removeEventListener("storage", handler);
+    return () => {
+      cancelled = true;
+      window.removeEventListener("storage", handler);
+    };
   }, []);
 
   const tabs = [

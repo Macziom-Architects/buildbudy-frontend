@@ -174,7 +174,7 @@ function BookingSuccessContent() {
           <h2 className="text-sm font-bold text-primary mb-3">What happens next?</h2>
           <div className="space-y-2.5">
             {[
-              "You'll receive an SMS and email confirmation shortly.",
+              "You'll receive an SMS confirmation shortly.",
               "A verified professional will call you within 30 minutes to confirm the slot.",
               "On the day of service, the pro will arrive at the scheduled time.",
               "After completion, you'll be asked to rate the service.",

@@ -284,7 +284,7 @@ export default function NotificationsPage() {
             </div>
             <div className="flex-1">
               <p className="text-sm font-bold text-primary">Notification Preferences</p>
-              <p className="text-xs text-muted mt-0.5">Choose which alerts you receive via email, SMS, or push.</p>
+              <p className="text-xs text-muted mt-0.5">Choose which alerts you receive via SMS or push notification.</p>
             </div>
             <Link
               href="/profile?section=settings"
