@@ -1,5 +1,5 @@
 import Link from "next/link";
-import Image from "next/image";
+import SafeImage from "@/components/ui/SafeImage";
 
 export default function CategoryCard({ label, href, image, className = "" }) {
   return (
@@ -9,7 +9,7 @@ export default function CategoryCard({ label, href, image, className = "" }) {
     >
       {/* Image — rounded top corners, overflow-hidden clips within them */}
       <div className="relative aspect-[4/3] overflow-hidden rounded-t-xl bg-gray-100">
-        <Image
+        <SafeImage
           src={image}
           alt={label}
           fill

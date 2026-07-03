@@ -1,10 +1,7 @@
 "use client";
 
-import { useEffect } from "react";
-import { useRouter } from "next/navigation";
+import PhoneAuthForm from "@/components/auth/PhoneAuthForm";
 
 export default function SignupPage() {
-  const router = useRouter();
-  useEffect(() => { router.replace("/auth/login"); }, [router]);
-  return null;
+  return <PhoneAuthForm mode="signup" />;
 }

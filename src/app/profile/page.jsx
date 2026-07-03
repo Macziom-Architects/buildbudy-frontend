@@ -6,12 +6,15 @@ import { useRouter, useSearchParams } from "next/navigation";
 import {
   User, MapPin, ShoppingBag, Heart, CreditCard, Settings,
   LogOut, ChevronRight, Plus, Edit2, Trash2, Shield,
-  Package, CheckCircle, Clock, Truck, Home, Bell,
-  Phone, Camera, X, Loader2, Building2, ArrowRight,
+  Package, Clock, Truck, Home, Bell,
+  Phone, Camera, Loader2, Building2, ArrowRight,
   Tag, BookOpen, Wrench, CheckCircle2, XCircle,
 } from "lucide-react";
 import Footer from "@/components/layout/Footer";
 import { Skeleton } from "@/components/ui/Skeleton";
+import { IMAGE_FALLBACK_SRC } from "@/components/ui/SafeImage";
+import AddressFormModal from "@/components/shared/AddressFormModal";
+import { useSelectedAddress } from "@/hooks/useSelectedAddress";
 import { useAuth } from "@/hooks/useAuth";
 import { useOrders } from "@/hooks/useOrders";
 import { useFetch } from "@/hooks/useFetch";
@@ -29,139 +32,11 @@ import {
   getNotifications,
   getUnreadCount as fetchUnreadCount,
 } from "@/lib/api/notifications";
-
 // ─── Constants ─────────────────────────────────────────────────────────────────
 
-const STATES = [
-  "Andhra Pradesh","Assam","Bihar","Chhattisgarh","Delhi","Goa","Gujarat",
-  "Haryana","Himachal Pradesh","Jharkhand","Karnataka","Kerala","Madhya Pradesh",
-  "Maharashtra","Manipur","Meghalaya","Mizoram","Nagaland","Odisha","Punjab",
-  "Rajasthan","Sikkim","Tamil Nadu","Telangana","Tripura","Uttar Pradesh",
-  "Uttarakhand","West Bengal",
-];
-
-const LABEL_OPTIONS = ["Home", "Office", "Other"];
-
-// ─── Address Modal ──────────────────────────────────────────────────────────────
-
-function AddressModal({ address, onClose, onSave }) {
-  const blank = {
-    label: "Home", name: "", line1: "", line2: "",
-    city: "", state: "", pincode: "", phone: "", isDefault: false,
-  };
-  const [form, setForm] = useState(address ? { ...address } : blank);
-  const [saving, setSaving] = useState(false);
-
-  function field(key) {
-    return (e) => setForm((p) => ({ ...p, [key]: e.target.value }));
-  }
-
-  async function handleSubmit(e) {
-    e.preventDefault();
-    setSaving(true);
-    try {
-      await onSave(form);
-      onClose();
-    } catch {
-      // keep modal open on API error
-    } finally {
-      setSaving(false);
-    }
-  }
-
-  const inputCls = "w-full border border-gray-200 rounded-lg px-3 py-2.5 text-sm text-primary placeholder:text-muted focus:outline-none focus:border-accent focus:ring-1 focus:ring-accent/30 transition-all";
-
-  return (
-    <div
-      className="fixed inset-0 z-50 flex items-end sm:items-center justify-center bg-black/50 backdrop-blur-sm p-4"
-      onClick={(e) => { if (e.target === e.currentTarget) onClose(); }}
-    >
-      <div className="w-full max-w-lg bg-white rounded-2xl shadow-2xl max-h-[90vh] overflow-y-auto">
-        <div className="flex items-center justify-between px-6 py-4 border-b border-gray-100 sticky top-0 bg-white rounded-t-2xl">
-          <h3 className="text-base font-bold text-primary">
-            {address ? "Edit Address" : "Add New Address"}
-          </h3>
-          <button onClick={onClose} className="p-1.5 rounded-full hover:bg-gray-100 transition-colors cursor-pointer">
-            <X className="h-4 w-4 text-muted" />
-          </button>
-        </div>
-        <form onSubmit={handleSubmit} className="p-6 space-y-4">
-          <div>
-            <label className="text-xs font-semibold text-muted uppercase tracking-wider mb-2 block">Address Type</label>
-            <div className="flex gap-2">
-              {LABEL_OPTIONS.map((opt) => (
-                <button
-                  key={opt} type="button"
-                  onClick={() => setForm((p) => ({ ...p, label: opt }))}
-                  className={`flex items-center gap-1.5 px-4 py-2 rounded-full text-xs font-semibold border transition-all cursor-pointer ${
-                    form.label === opt ? "bg-primary text-white border-primary" : "border-gray-200 text-gray-600 hover:border-primary"
-                  }`}
-                >
-                  {opt === "Home" ? <Home className="h-3 w-3" /> : opt === "Office" ? <Building2 className="h-3 w-3" /> : <MapPin className="h-3 w-3" />}
-                  {opt}
-                </button>
-              ))}
-            </div>
-          </div>
-          <div className="grid grid-cols-2 gap-3">
-            <div>
-              <label className="text-xs font-semibold text-muted uppercase tracking-wider mb-1.5 block">Full Name</label>
-              <input value={form.name} onChange={field("name")} required placeholder="Full Name" className={inputCls} />
-            </div>
-            <div>
-              <label className="text-xs font-semibold text-muted uppercase tracking-wider mb-1.5 block">Phone</label>
-              <input value={form.phone} onChange={field("phone")} required placeholder="+91 98765 43210" className={inputCls} />
-            </div>
-          </div>
-          <div>
-            <label className="text-xs font-semibold text-muted uppercase tracking-wider mb-1.5 block">Flat / House / Building</label>
-            <input value={form.line1} onChange={field("line1")} required placeholder="Flat no, Building name" className={inputCls} />
-          </div>
-          <div>
-            <label className="text-xs font-semibold text-muted uppercase tracking-wider mb-1.5 block">Area / Street</label>
-            <input value={form.line2} onChange={field("line2")} placeholder="Street, Area, Locality" className={inputCls} />
-          </div>
-          <div className="grid grid-cols-3 gap-3">
-            <div className="col-span-1">
-              <label className="text-xs font-semibold text-muted uppercase tracking-wider mb-1.5 block">Pincode</label>
-              <input value={form.pincode} onChange={field("pincode")} required placeholder="400058" maxLength={6} pattern="\d{6}" className={inputCls} />
-            </div>
-            <div className="col-span-2">
-              <label className="text-xs font-semibold text-muted uppercase tracking-wider mb-1.5 block">City</label>
-              <input value={form.city} onChange={field("city")} required placeholder="Mumbai" className={inputCls} />
-            </div>
-          </div>
-          <div>
-            <label className="text-xs font-semibold text-muted uppercase tracking-wider mb-1.5 block">State</label>
-            <select value={form.state} onChange={field("state")} required className={inputCls}>
-              <option value="">Select State</option>
-              {STATES.map((s) => <option key={s} value={s}>{s}</option>)}
-            </select>
-          </div>
-          <label className="flex items-center gap-3 cursor-pointer group">
-            <div
-              onClick={() => setForm((p) => ({ ...p, isDefault: !p.isDefault }))}
-              className={`h-5 w-5 rounded-md border-2 flex items-center justify-center transition-all cursor-pointer ${
-                form.isDefault ? "bg-primary border-primary" : "border-gray-300 group-hover:border-primary"
-              }`}
-            >
-              {form.isDefault && <CheckCircle className="h-3 w-3 text-white" />}
-            </div>
-            <span className="text-sm font-medium text-primary">Set as default address</span>
-          </label>
-          <div className="flex gap-3 pt-2">
-            <button type="button" onClick={onClose} className="flex-1 py-2.5 rounded-xl border border-gray-200 text-sm font-semibold text-primary hover:bg-gray-50 transition-colors cursor-pointer">
-              Cancel
-            </button>
-            <button type="submit" disabled={saving} className="flex-1 py-2.5 rounded-xl bg-primary text-white text-sm font-bold hover:bg-primary/90 transition-colors disabled:opacity-60 flex items-center justify-center gap-2 cursor-pointer">
-              {saving && <Loader2 className="h-4 w-4 animate-spin" />}
-              {saving ? "Saving…" : "Save Address"}
-            </button>
-          </div>
-        </form>
-      </div>
-    </div>
-  );
+function handleImgError(e) {
+  if (e.currentTarget.src.endsWith(IMAGE_FALLBACK_SRC)) return;
+  e.currentTarget.src = IMAGE_FALLBACK_SRC;
 }
 
 // ─── Section shell ──────────────────────────────────────────────────────────────
@@ -344,7 +219,7 @@ function WishlistSection() {
           <div key={product.id} className="flex items-center gap-3 p-3 rounded-xl border border-gray-100 hover:border-gray-200 transition-all">
             <div className="h-12 w-12 rounded-lg bg-gray-100 flex items-center justify-center flex-shrink-0 overflow-hidden">
               {product.image
-                ? <img src={product.image} alt={product.name} className="h-full w-full object-cover" />
+                ? <img src={product.image} alt={product.name} onError={handleImgError} className="h-full w-full object-cover" />
                 : <Package className="h-5 w-5 text-gray-400" />
               }
             </div>
@@ -376,24 +251,37 @@ function AddressesSection() {
   const [modal, setModal] = useState(null);
   const { data, loading, error, refetch } = useFetch(getAddresses, []);
   const addresses = data ?? [];
+  const { selectedAddress, selectAddress, clearSelection } = useSelectedAddress();
 
   async function handleSave(form) {
-    if (form.id) {
-      await apiUpdateAddress(form.id, form);
-    } else {
-      await createAddress(form);
-    }
+    const saved = form.id
+      ? await apiUpdateAddress(form.id, form)
+      : await createAddress(form);
     await refetch();
+    // Keep the navbar/checkout selection in sync when the edited/created
+    // address is the one currently selected (or becomes the new default).
+    if (saved?.isDefault || selectedAddress?.id === saved?.id) {
+      selectAddress(saved);
+    }
   }
 
   async function handleDelete(id) {
     await apiDeleteAddress(id);
     await refetch();
+    if (selectedAddress?.id === String(id)) {
+      const remaining = await getAddresses();
+      const next = remaining.find((a) => a.isDefault) ?? remaining[0] ?? null;
+      if (next) selectAddress(next);
+      else clearSelection();
+    }
   }
 
   async function handleSetDefault(id) {
     await setDefaultAddress(id);
     await refetch();
+    const updated = await getAddresses();
+    const newDefault = updated.find((a) => a.id === String(id));
+    if (newDefault) selectAddress(newDefault);
   }
 
   if (loading) {
@@ -432,7 +320,7 @@ function AddressesSection() {
   return (
     <>
       {modal !== null && (
-        <AddressModal
+        <AddressFormModal
           address={modal === "add" ? null : modal}
           onClose={() => setModal(null)}
           onSave={handleSave}
@@ -804,7 +692,7 @@ function ProfilePageInner() {
               <div className="relative flex-shrink-0">
                 <div className="h-20 w-20 rounded-2xl bg-accent/20 flex items-center justify-center border-2 border-accent/30">
                   {user?.avatar
-                    ? <img src={user.avatar} alt="" className="h-full w-full object-cover rounded-2xl" />
+                    ? <img src={user.avatar} alt="" onError={handleImgError} className="h-full w-full object-cover rounded-2xl" />
                     : <span className="text-2xl font-bold text-accent">{initials}</span>
                   }
                 </div>

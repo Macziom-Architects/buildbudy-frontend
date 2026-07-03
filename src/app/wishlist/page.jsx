@@ -1,6 +1,6 @@
 "use client";
 
-import Image from "next/image";
+import SafeImage from "@/components/ui/SafeImage";
 import Link from "next/link";
 import { Heart, ShoppingCart, Trash2, ArrowRight } from "lucide-react";
 import { useWishlist } from "@/context/WishlistContext";
@@ -92,7 +92,7 @@ export default function WishlistPage() {
                       </button>
                       <Link href={`/products/${product.id}`} className="block">
                         <div className="flex aspect-square items-center justify-center p-5">
-                          <Image
+                          <SafeImage
                             src={product.image}
                             alt={product.name}
                             width={200}

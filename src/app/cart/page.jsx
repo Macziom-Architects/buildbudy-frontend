@@ -1,7 +1,7 @@
 "use client";
 
 import { useState } from "react";
-import Image from "next/image";
+import SafeImage from "@/components/ui/SafeImage";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
 import {
@@ -113,7 +113,7 @@ export default function CartPage() {
                       href={`/products/${item.id}`}
                       className="w-[88px] h-[88px] shrink-0 bg-gray-50 border border-gray-100 rounded-xl flex items-center justify-center hover:border-gray-200 transition-colors"
                     >
-                      <Image
+                      <SafeImage
                         src={item.image}
                         alt={item.name}
                         width={80}

@@ -1,6 +1,6 @@
 "use client";
 
-import Image from "next/image";
+import SafeImage from "@/components/ui/SafeImage";
 import Link from "next/link";
 import { Heart, ShoppingCart } from "lucide-react";
 import { useCart } from "@/context/CartContext";
@@ -102,7 +102,7 @@ export default function ProductCard({ product }) {
         )}
 
         <div className="flex aspect-square items-center justify-center p-4">
-          <Image
+          <SafeImage
             src={product.image}
             alt={product.name}
             width={200}

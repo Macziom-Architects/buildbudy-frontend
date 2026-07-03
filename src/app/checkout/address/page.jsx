@@ -6,16 +6,8 @@ import { useCart } from "@/context/CartContext";
 import { useAuth } from "@/hooks/useAuth";
 import { getAddresses, createAddress } from "@/lib/api/addresses";
 import { Home, Building2, MapPin, CheckCircle2 } from "lucide-react";
-
-const INDIAN_STATES = [
-  "Andhra Pradesh","Arunachal Pradesh","Assam","Bihar","Chhattisgarh",
-  "Goa","Gujarat","Haryana","Himachal Pradesh","Jharkhand","Karnataka",
-  "Kerala","Madhya Pradesh","Maharashtra","Manipur","Meghalaya","Mizoram",
-  "Nagaland","Odisha","Punjab","Rajasthan","Sikkim","Tamil Nadu","Telangana",
-  "Tripura","Uttar Pradesh","Uttarakhand","West Bengal",
-  "Andaman and Nicobar Islands","Chandigarh","Dadra and Nagar Haveli and Daman and Diu",
-  "Delhi","Jammu and Kashmir","Ladakh","Lakshadweep","Puducherry",
-];
+import { INDIAN_STATES } from "@/lib/indianStates";
+import { useSelectedAddress } from "@/hooks/useSelectedAddress";
 
 const EMPTY_FORM = {
   fullName: "",
@@ -49,6 +41,7 @@ export default function AddressPage() {
   const router    = useRouter();
   const { cartItems } = useCart();
   const { isLoggedIn } = useAuth();
+  const { selectedAddress, selectAddress } = useSelectedAddress();
 
   const [form, setForm]               = useState(EMPTY_FORM);
   const [saveAddress, setSaveAddress] = useState(true);
@@ -70,12 +63,17 @@ export default function AddressPage() {
       .then((addrs) => {
         if (!addrs?.length) return;
         setSavedAddresses(addrs);
-        // Pre-fill with default address
-        const def = addrs.find((a) => a.isDefault) ?? addrs[0];
-        setSelectedSavedId(def.id);
-        setForm(addrToForm(def));
+        // Prefer whatever the navbar's location picker has selected, so the
+        // two stay in sync; fall back to the account default.
+        const preferred =
+          addrs.find((a) => a.id === selectedAddress?.id) ??
+          addrs.find((a) => a.isDefault) ??
+          addrs[0];
+        setSelectedSavedId(preferred.id);
+        setForm(addrToForm(preferred));
       })
       .catch(() => {}); // silent — guest fallback is always available
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [isLoggedIn, router]);
 
   const subtotal = cartItems.reduce((s, i) => s + i.price * i.quantity, 0);
@@ -106,6 +104,7 @@ export default function AddressPage() {
     setSelectedSavedId(addr.id);
     setForm(addrToForm(addr));
     setErrors({});
+    selectAddress(addr); // keep navbar/delivery estimates in sync immediately
   }
 
   async function handleSubmit(e) {
@@ -119,19 +118,27 @@ export default function AddressPage() {
     // Always persist for this checkout session
     localStorage.setItem("bb_address", JSON.stringify(form));
 
+    const draftAddress = {
+      label:    "Home",
+      name:     form.fullName,
+      line1:    form.addressLine1,
+      line2:    form.addressLine2,
+      city:     form.city,
+      state:    form.state,
+      pincode:  form.pincode,
+      phone:    `+91 ${form.phone}`,
+      isDefault: savedAddresses.length === 0,
+    };
+
     // Persist to backend only when user explicitly wants to save a NEW address
     if (saveAddress && isLoggedIn && !selectedSavedId) {
-      createAddress({
-        label:    "Home",
-        name:     form.fullName,
-        line1:    form.addressLine1,
-        line2:    form.addressLine2,
-        city:     form.city,
-        state:    form.state,
-        pincode:  form.pincode,
-        phone:    `+91 ${form.phone}`,
-        isDefault: savedAddresses.length === 0,
-      }).catch(() => {}); // best-effort, don't block checkout
+      createAddress(draftAddress)
+        .then((created) => selectAddress(created))
+        .catch(() => {}); // best-effort, don't block checkout
+    } else if (!selectedSavedId) {
+      // Guest / not-saved checkout — still reflect the chosen address across
+      // the navbar and delivery estimates for this session.
+      selectAddress(draftAddress);
     }
 
     router.push("/checkout/payment");

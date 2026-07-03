@@ -1,20 +1,31 @@
 "use client";
 
-import { useState, useRef } from "react";
+import { useState, useRef, useEffect } from "react";
 import Link from "next/link";
 import Image from "next/image";
-import { usePathname } from "next/navigation";
-import { MapPin, User, ShoppingCart, Heart, Menu, X, ChevronRight, Truck } from "lucide-react";
+import { usePathname, useRouter } from "next/navigation";
+import { MapPin, User, ShoppingCart, Heart, Menu, X, ChevronRight, Truck, Bell } from "lucide-react";
 import { useWishlist } from "@/context/WishlistContext";
 import SearchBar from "@/components/ui/SearchBar";
 import { useCart } from "@/context/CartContext";
 import { useAuth } from "@/hooks/useAuth";
+import { useSelectedAddress } from "@/hooks/useSelectedAddress";
+import { getUnreadCount } from "@/lib/api/notifications";
+import LocationPickerModal from "@/components/layout/LocationPickerModal";
 
-const LOCATION = { city: "Mumbai", area: "Andheri West", pincode: "400058" };
+function LocationPopover({ selectedAddress, onManageAddresses, onChangeLocation, onClose }) {
+  const area = selectedAddress
+    ? [selectedAddress.line2, selectedAddress.line1].filter(Boolean).join(", ") || selectedAddress.label
+    : "Set your delivery location";
+  const city = selectedAddress?.city ?? "";
+  const pincode = selectedAddress?.pincode ?? "";
 
-function LocationPopover({ onClose }) {
   return (
-    <div className="absolute top-full left-1/2 -translate-x-1/2 mt-2 w-64 bg-white rounded-xl shadow-xl border border-gray-100 z-50 overflow-hidden">
+    <div
+      role="dialog"
+      aria-label="Delivery location"
+      className="absolute top-full left-1/2 -translate-x-1/2 mt-2 w-72 bg-white rounded-xl shadow-xl border border-gray-100 z-50 overflow-hidden"
+    >
       {/* Arrow */}
       <div className="absolute -top-1.5 left-1/2 -translate-x-1/2 h-3 w-3 bg-white border-l border-t border-gray-100 rotate-45" />
 
@@ -22,11 +33,11 @@ function LocationPopover({ onClose }) {
       <div className="bg-primary px-4 py-3">
         <div className="flex items-center gap-2">
           <MapPin className="h-4 w-4 text-accent flex-shrink-0" />
-          <div>
-            <p className="text-xs font-bold text-white leading-tight">
-              {LOCATION.area}, {LOCATION.city}
+          <div className="min-w-0">
+            <p className="text-xs font-bold text-white leading-tight truncate">
+              {city ? `${area}, ${city}` : area}
             </p>
-            <p className="text-[10px] text-white/50">PIN: {LOCATION.pincode}</p>
+            {pincode && <p className="text-[10px] text-white/50">PIN: {pincode}</p>}
           </div>
         </div>
       </div>
@@ -40,17 +51,18 @@ function LocationPopover({ onClose }) {
             <p className="text-[11px] text-muted mt-0.5">Orders above ₹999 ship free</p>
           </div>
         </div>
-        <Link
-          href="/profile"
-          onClick={onClose}
-          className="flex items-center justify-between w-full bg-accent text-primary text-xs font-bold px-3 py-2 rounded-lg hover:bg-accent/90 transition-colors cursor-pointer"
+        <button
+          type="button"
+          onClick={() => { onClose(); onManageAddresses(); }}
+          className="flex items-center justify-between w-full bg-accent text-primary text-xs font-bold px-3 py-2 rounded-lg hover:bg-accent/90 transition-colors cursor-pointer focus:outline-none focus-visible:ring-2 focus-visible:ring-accent focus-visible:ring-offset-1"
         >
           Manage Addresses
           <ChevronRight className="h-3.5 w-3.5" />
-        </Link>
+        </button>
         <button
-          onClick={onClose}
-          className="mt-2 w-full text-center text-[11px] text-muted hover:text-primary transition-colors cursor-pointer"
+          type="button"
+          onClick={() => { onClose(); onChangeLocation(); }}
+          className="mt-2 w-full text-center text-[11px] text-muted hover:text-primary transition-colors cursor-pointer focus:outline-none focus-visible:underline"
         >
           Change location
         </button>
@@ -67,15 +79,65 @@ const NAV_LINKS = [
 ];
 
 export default function Navbar() {
+  const router = useRouter();
   const [mobileOpen, setMobileOpen] = useState(false);
   const [locationOpen, setLocationOpen] = useState(false);
+  const [locationPickerOpen, setLocationPickerOpen] = useState(false);
   const locationRef = useRef(null);
   const { cartItems } = useCart();
   const { wishlist } = useWishlist();
   const cartCount    = cartItems.reduce((sum, item) => sum + item.quantity, 0);
   const wishCount    = wishlist.length;
   const { isLoggedIn } = useAuth();
+  const { selectedAddress } = useSelectedAddress();
   const pathname = usePathname();
+
+  const [notifCount, setNotifCount] = useState(0);
+  useEffect(() => {
+    if (!isLoggedIn) return;
+    let cancelled = false;
+    async function fetchCount() {
+      try {
+        const count = await getUnreadCount();
+        if (!cancelled) setNotifCount(count);
+      } catch {}
+    }
+    fetchCount();
+    window.addEventListener("storage", fetchCount);
+    return () => {
+      cancelled = true;
+      window.removeEventListener("storage", fetchCount);
+    };
+  }, [isLoggedIn]);
+
+  // Close the location popover on outside click / Escape, keeping it keyboard accessible.
+  useEffect(() => {
+    if (!locationOpen) return;
+    function handlePointerDown(e) {
+      if (locationRef.current && !locationRef.current.contains(e.target)) {
+        setLocationOpen(false);
+      }
+    }
+    function handleKeyDown(e) {
+      if (e.key === "Escape") setLocationOpen(false);
+    }
+    document.addEventListener("mousedown", handlePointerDown);
+    document.addEventListener("keydown", handleKeyDown);
+    return () => {
+      document.removeEventListener("mousedown", handlePointerDown);
+      document.removeEventListener("keydown", handleKeyDown);
+    };
+  }, [locationOpen]);
+
+  function goToManageAddresses() {
+    router.push("/profile?section=addresses");
+  }
+
+  const mobileArea = selectedAddress
+    ? [selectedAddress.line2, selectedAddress.line1].filter(Boolean).join(", ") || selectedAddress.label
+    : "Set your delivery location";
+  const mobileCity = selectedAddress?.city ?? "";
+  const mobilePincode = selectedAddress?.pincode ?? "";
 
   return (
     <header className="sticky top-0 z-50">
@@ -147,32 +209,35 @@ export default function Navbar() {
               />
             </div>
 
-            {/* Auth button — desktop */}
+            {/* Auth buttons — desktop */}
             {!isLoggedIn && (
-              <div className="hidden md:flex items-center gap-3 flex-shrink-0">
+              <div className="hidden md:flex items-center gap-2 flex-shrink-0">
                 <Link
                   href="/auth/login"
-                  className="text-sm font-semibold bg-accent text-primary rounded-md px-4 py-2 hover:bg-accent/90 transition-colors duration-150"
+                  className="text-sm font-semibold text-white border border-white/20 rounded-md px-4 py-2 hover:bg-white/10 transition-colors duration-150 cursor-pointer"
                 >
                   Sign In
+                </Link>
+                <Link
+                  href="/auth/signup"
+                  className="text-sm font-semibold bg-accent text-primary rounded-md px-4 py-2 hover:bg-accent/90 transition-colors duration-150 cursor-pointer"
+                >
+                  Sign Up
                 </Link>
               </div>
             )}
 
             {/* Right icons — desktop */}
             <div className="hidden md:flex items-center gap-1 flex-shrink-0">
-              {/* Location with hover popover */}
-              <div
-                ref={locationRef}
-                className="relative"
-                onMouseEnter={() => setLocationOpen(true)}
-                onMouseLeave={() => setLocationOpen(false)}
-              >
+              {/* Location — click to open/close popover */}
+              <div ref={locationRef} className="relative">
                 <button
-                  aria-label="Set location"
+                  type="button"
+                  aria-label="Delivery location"
+                  aria-haspopup="dialog"
                   aria-expanded={locationOpen}
                   onClick={() => setLocationOpen((p) => !p)}
-                  className={`p-2 rounded-md transition-colors cursor-pointer ${
+                  className={`p-2 rounded-md transition-colors cursor-pointer focus:outline-none focus-visible:ring-2 focus-visible:ring-accent ${
                     locationOpen
                       ? "text-accent bg-white/10"
                       : "text-white/70 hover:text-white hover:bg-white/10"
@@ -181,9 +246,28 @@ export default function Navbar() {
                   <MapPin className="h-5 w-5" />
                 </button>
                 {locationOpen && (
-                  <LocationPopover onClose={() => setLocationOpen(false)} />
+                  <LocationPopover
+                    selectedAddress={selectedAddress}
+                    onClose={() => setLocationOpen(false)}
+                    onManageAddresses={goToManageAddresses}
+                    onChangeLocation={() => setLocationPickerOpen(true)}
+                  />
                 )}
               </div>
+              {isLoggedIn && (
+                <Link
+                  href="/notifications"
+                  aria-label="Notifications"
+                  className="relative p-2 text-white/70 rounded-md hover:text-white hover:bg-white/10 transition-colors"
+                >
+                  <Bell className="h-5 w-5" />
+                  {notifCount > 0 && (
+                    <span className="absolute -top-0.5 -right-0.5 h-4 w-4 bg-red-500 text-white text-[10px] font-bold rounded-full flex items-center justify-center leading-none">
+                      {notifCount > 9 ? "9+" : notifCount}
+                    </span>
+                  )}
+                </Link>
+              )}
               <Link
                 href="/profile"
                 aria-label="Profile"
@@ -292,16 +376,20 @@ export default function Navbar() {
                 <div className="flex items-center gap-3 px-3 py-2.5 rounded-lg bg-white/5">
                   <MapPin className="h-4 w-4 text-accent flex-shrink-0" />
                   <div className="flex-1 min-w-0">
-                    <p className="text-xs font-semibold text-white">{LOCATION.area}, {LOCATION.city}</p>
-                    <p className="text-[10px] text-white/40">PIN {LOCATION.pincode} · Free delivery above ₹999</p>
+                    <p className="text-xs font-semibold text-white truncate">
+                      {mobileCity ? `${mobileArea}, ${mobileCity}` : mobileArea}
+                    </p>
+                    <p className="text-[10px] text-white/40">
+                      {mobilePincode ? `PIN ${mobilePincode} · ` : ""}Free delivery above ₹999
+                    </p>
                   </div>
-                  <Link
-                    href="/profile"
-                    onClick={() => setMobileOpen(false)}
-                    className="text-[11px] font-bold text-accent hover:text-accent/80 transition-colors flex-shrink-0 cursor-pointer"
+                  <button
+                    type="button"
+                    onClick={() => { setMobileOpen(false); setLocationPickerOpen(true); }}
+                    className="text-[11px] font-bold text-accent hover:text-accent/80 transition-colors flex-shrink-0 cursor-pointer focus:outline-none focus-visible:underline"
                   >
                     Change
-                  </Link>
+                  </button>
                 </div>
                 <Link
                   href="/profile"
@@ -313,13 +401,20 @@ export default function Navbar() {
                 </Link>
               </div>
               {!isLoggedIn && (
-                <div className="mt-2 pt-2 border-t border-white/10">
+                <div className="mt-2 pt-2 border-t border-white/10 flex items-center gap-2">
                   <Link
                     href="/auth/login"
                     onClick={() => setMobileOpen(false)}
-                    className="flex items-center justify-center w-full px-4 py-2.5 text-sm font-semibold bg-accent text-primary rounded-md hover:bg-accent/90 transition-colors"
+                    className="flex-1 flex items-center justify-center px-4 py-2.5 text-sm font-semibold text-white border border-white/20 rounded-md hover:bg-white/10 transition-colors cursor-pointer"
                   >
-                    Sign In / Register
+                    Sign In
+                  </Link>
+                  <Link
+                    href="/auth/signup"
+                    onClick={() => setMobileOpen(false)}
+                    className="flex-1 flex items-center justify-center px-4 py-2.5 text-sm font-semibold bg-accent text-primary rounded-md hover:bg-accent/90 transition-colors cursor-pointer"
+                  >
+                    Sign Up
                   </Link>
                 </div>
               )}
@@ -327,6 +422,8 @@ export default function Navbar() {
           </div>
         )}
       </div>
+
+      <LocationPickerModal open={locationPickerOpen} onClose={() => setLocationPickerOpen(false)} />
     </header>
   );
 }

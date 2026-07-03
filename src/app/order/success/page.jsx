@@ -2,7 +2,7 @@
 
 import { useEffect, useState } from "react";
 import { useRouter } from "next/navigation";
-import Image from "next/image";
+import SafeImage from "@/components/ui/SafeImage";
 import Link from "next/link";
 import ProductCard from "@/components/product/ProductCard";
 import Footer from "@/components/layout/Footer";
@@ -145,7 +145,7 @@ export default function OrderSuccessPage() {
                 {items.map((item) => (
                   <div key={item.id} className="flex items-center gap-2.5">
                     <div className="w-8 h-8 shrink-0 bg-white/10 rounded flex items-center justify-center">
-                      <Image src={item.image} alt={item.name} width={28} height={28} className="object-contain" />
+                      <SafeImage src={item.image} alt={item.name} width={28} height={28} className="object-contain" />
                     </div>
                     <p className="flex-1 min-w-0 text-xs text-gray-300 truncate">{item.name}</p>
                     <p className="text-xs text-gray-300 shrink-0">×{item.quantity}</p>

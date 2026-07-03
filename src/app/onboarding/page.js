@@ -9,6 +9,8 @@ import {
   MapPin, CheckCircle, User,
 } from "lucide-react";
 import { useAuth } from "@/hooks/useAuth";
+import { createAddress } from "@/lib/api/addresses";
+import { INDIAN_STATES } from "@/lib/indianStates";
 
 const PREFERENCE_STEPS = [
   {
@@ -64,8 +66,10 @@ export default function OnboardingPage() {
   const [name, setName] = useState("");
   const [nameError, setNameError] = useState("");
   const [answers, setAnswers] = useState(INITIAL_PREFS);
+  const [address, setAddress] = useState("");
   const [city, setCity] = useState("");
   const [pincode, setPincode] = useState("");
+  const [state, setState] = useState("");
   const [locating, setLocating] = useState(false);
   const [done, setDone] = useState(false);
 
@@ -116,7 +120,7 @@ export default function OnboardingPage() {
     if (!currentPrefStep) return false;
     if (currentPrefStep.type === "single") return answers[currentPrefStep.key] !== null;
     if (currentPrefStep.type === "multi")  return answers[currentPrefStep.key].length > 0;
-    if (currentPrefStep.type === "location") return !!answers.location || city.trim() !== "";
+    if (currentPrefStep.type === "location") return true; // address is optional — always allowed to continue
     return true;
   })();
 
@@ -132,9 +136,12 @@ export default function OnboardingPage() {
     }
 
     if (step === TOTAL_STEPS) {
+      const hasManualAddress = city.trim() || pincode.trim() || state || address.trim();
       const loc =
         answers.location ||
-        (city.trim() ? { city, pincode: pincode.trim(), type: "manual" } : null);
+        (hasManualAddress
+          ? { address: address.trim(), city: city.trim(), pincode: pincode.trim(), state, type: "manual" }
+          : null);
       const preferences = { ...answers, location: loc };
       const phone = user?.phone || localStorage.getItem("bb_pending_phone") || "";
 
@@ -142,6 +149,24 @@ export default function OnboardingPage() {
         await completeOnboarding({ name: name.trim(), phone, preferences });
       } catch {
         // Gracefully continue even if the API call fails so the user isn't stuck
+      }
+
+      if (hasManualAddress && city.trim() && pincode.trim() && state) {
+        try {
+          await createAddress({
+            label: "Home",
+            name: name.trim(),
+            line1: address.trim() || "Address not specified",
+            line2: "",
+            city: city.trim(),
+            state,
+            pincode: pincode.trim(),
+            phone,
+            isDefault: true,
+          });
+        } catch {
+          // Non-blocking — user can add/edit addresses later from their profile
+        }
       }
 
       setDone(true);
@@ -260,6 +285,10 @@ export default function OnboardingPage() {
 
             {currentPrefStep.type === "location" && (
               <div className="flex flex-col gap-3">
+                <p className="text-xs text-muted -mt-2">
+                  Optional — helps us show accurate delivery estimates. You can skip this and add it later from your profile.
+                </p>
+
                 <button
                   onClick={detectLocation}
                   disabled={locating}
@@ -283,7 +312,24 @@ export default function OnboardingPage() {
                   <div className="flex-1 h-px bg-gray-200" />
                 </div>
 
+                <input
+                  type="text"
+                  value={address}
+                  onChange={(e) => setAddress(e.target.value)}
+                  placeholder="Address (optional) — House no, street"
+                  className="border border-gray-200 rounded-md px-3 py-2 text-sm text-primary placeholder:text-muted focus:outline-none focus:border-accent transition-colors"
+                />
+
                 <div className="flex gap-2">
+                  <input
+                    type="text"
+                    value={pincode}
+                    onChange={(e) => setPincode(e.target.value.replace(/\D/g, "").slice(0, 6))}
+                    placeholder="Pincode"
+                    inputMode="numeric"
+                    maxLength={6}
+                    className="w-28 border border-gray-200 rounded-md px-3 py-2 text-sm text-primary placeholder:text-muted focus:outline-none focus:border-accent transition-colors"
+                  />
                   <input
                     type="text"
                     value={city}
@@ -291,15 +337,16 @@ export default function OnboardingPage() {
                     placeholder="City"
                     className="flex-1 border border-gray-200 rounded-md px-3 py-2 text-sm text-primary placeholder:text-muted focus:outline-none focus:border-accent transition-colors"
                   />
-                  <input
-                    type="text"
-                    value={pincode}
-                    onChange={(e) => setPincode(e.target.value)}
-                    placeholder="Pincode"
-                    maxLength={6}
-                    className="w-28 border border-gray-200 rounded-md px-3 py-2 text-sm text-primary placeholder:text-muted focus:outline-none focus:border-accent transition-colors"
-                  />
                 </div>
+
+                <select
+                  value={state}
+                  onChange={(e) => setState(e.target.value)}
+                  className="border border-gray-200 rounded-md px-3 py-2 text-sm text-primary focus:outline-none focus:border-accent transition-colors"
+                >
+                  <option value="">Select State (optional)</option>
+                  {INDIAN_STATES.map((s) => <option key={s} value={s}>{s}</option>)}
+                </select>
               </div>
             )}
           </>

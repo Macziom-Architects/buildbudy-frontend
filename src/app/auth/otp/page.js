@@ -4,6 +4,7 @@ import { useState, useRef, useEffect, Suspense } from "react";
 import { useRouter } from "next/navigation";
 import { Phone, CheckCircle, Loader2 } from "lucide-react";
 import { useAuth } from "@/hooks/useAuth";
+import { DEMO_PHONE, DEMO_OTP } from "@/lib/api/auth";
 
 function OTPForm() {
   const router = useRouter();
@@ -109,6 +110,12 @@ function OTPForm() {
           Enter the 6-digit code sent to{" "}
           <span className="text-primary font-semibold">{maskedPhone}</span>
         </p>
+
+        {phone === DEMO_PHONE && (
+          <p className="text-xs text-accent font-semibold bg-accent/10 rounded-md px-3 py-2 mb-4">
+            Demo account — enter {DEMO_OTP} to continue
+          </p>
+        )}
 
         <div className="flex gap-2 justify-center mb-4" onPaste={handlePaste}>
           {otp.map((digit, i) => (

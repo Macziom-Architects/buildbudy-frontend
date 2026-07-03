@@ -1,51 +1,22 @@
+/**
+ * BuildBudy's product catalogue is scraped from 50+ independent seller
+ * domains (see buildbudy_products.json / src/lib/data/products.json), and
+ * that list keeps growing as new products are added. Next.js's
+ * `images.remotePatterns` allowlist is capped at 50 entries, so hardcoding
+ * (or even auto-deriving) a per-hostname list is a moving target that will
+ * eventually hit the ceiling and crash the build again.
+ *
+ * Disabling built-in image optimization removes the hostname allowlist
+ * requirement entirely — every external image URL is allowed, regardless of
+ * which seller domain it comes from — while `SafeImage`
+ * (src/components/ui/SafeImage.jsx) still guards every render against a
+ * 404/broken URL by swapping in a local placeholder on error.
+ */
+
 /** @type {import('next').NextConfig} */
 const nextConfig = {
   images: {
-    remotePatterns: [
-      { protocol: "https", hostname: "placehold.co" },
-      { protocol: "https", hostname: "**.imimg.com" },
-      { protocol: "https", hostname: "ik.imagekit.io" },
-      { protocol: "https", hostname: "m.media-amazon.com" },
-      { protocol: "https", hostname: "images-eu.ssl-images-amazon.com" },
-      { protocol: "https", hostname: "rukminim2.flixcart.com" },
-      { protocol: "https", hostname: "cdn.shopify.com" },
-      { protocol: "https", hostname: "cdn.moglix.com" },
-      { protocol: "https", hostname: "static1.industrybuying.com" },
-      { protocol: "https", hostname: "home-run.co" },
-      { protocol: "https", hostname: "www.jkcement.com" },
-      { protocol: "https", hostname: "hanumanbuilders.com" },
-      { protocol: "https", hostname: "www.halonix.co.in" },
-      { protocol: "https", hostname: "havells.com" },
-      { protocol: "https", hostname: "www.crompton.co.in" },
-      { protocol: "https", hostname: "cdn.eleczo.com" },
-      { protocol: "https", hostname: "handlevandle.com" },
-      { protocol: "https", hostname: "www.ozone.in" },
-      { protocol: "https", hostname: "mccoymart.com" },
-      { protocol: "https", hostname: "bathkart.in" },
-      { protocol: "https", hostname: "www.ashirvad.com" },
-      { protocol: "https", hostname: "robocraze.com" },
-      { protocol: "https", hostname: "www.jiomart.com" },
-      { protocol: "https", hostname: "robu.in" },
-      { protocol: "https", hostname: "tapariatools.tapariatools.com" },
-      { protocol: "https", hostname: "images.toolworld.in" },
-      { protocol: "https", hostname: "img.cdnx.in" },
-      { protocol: "https", hostname: "img.clevup.in" },
-      { protocol: "https", hostname: "tiimg.tistatic.com" },
-      { protocol: "https", hostname: "backend.buildsupplyco.com" },
-      { protocol: "https", hostname: "lntsufin.com" },
-      { protocol: "https", hostname: "user-gen-media-assets.s3.amazonaws.com" },
-      { protocol: "https", hostname: "download.schneider-electric.com" },
-      { protocol: "https", hostname: "shop.schneider-electric.co.in" },
-      { protocol: "https", hostname: "assets.hager.com" },
-      { protocol: "https", hostname: "tansoindia.com" },
-      { protocol: "https", hostname: "images-cdn.ubuy.co.in" },
-      { protocol: "https", hostname: "buildpro.store" },
-      { protocol: "https", hostname: "polytuf.in" },
-      { protocol: "https", hostname: "evergreenhardware.in" },
-      { protocol: "https", hostname: "img500.exportersindia.com" },
-      { protocol: "https", hostname: "i0.wp.com" },
-      { protocol: "https", hostname: "**.amazonaws.com" },
-    ],
+    unoptimized: true,
   },
 };
 
