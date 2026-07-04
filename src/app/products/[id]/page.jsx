@@ -6,7 +6,7 @@ import {
   PackageCheck, RotateCcw, ShieldCheck, Truck, Zap, Home,
 } from "lucide-react";
 import Footer from "@/components/layout/Footer";
-import { getProductById, getProducts } from "@/lib/api/products";
+import { fetchProductBySlug, getProducts } from "@/lib/api/products";
 import ProductGallery from "./ProductGallery";
 import ProductActions from "./ProductActions";
 import ProductFAQ from "./ProductFAQ";
@@ -102,14 +102,15 @@ function Stars({ rating, size = "sm" }) {
 // ─── generateStaticParams ─────────────────────────────────────────────────────
 
 export function generateStaticParams() {
-  return getProducts().map((p) => ({ id: p.id }));
+  // The dynamic segment carries the product slug (backend resolves products by slug).
+  return getProducts().map((p) => ({ id: p.slug }));
 }
 
 // ─── Page ─────────────────────────────────────────────────────────────────────
 
 export default async function ProductDetailsPage({ params }) {
-  const { id }   = await params;
-  const product  = getProductById(id);
+  const { id: slug } = await params;
+  const product      = await fetchProductBySlug(slug);
   if (!product) notFound();
 
   const galleryImages = getGalleryImages(product);
@@ -188,13 +189,13 @@ export default async function ProductDetailsPage({ params }) {
               <div className="flex items-baseline gap-1">
                 <span className="text-sm font-medium text-gray-500 leading-none">₹</span>
                 <span className="text-3xl font-bold leading-none text-primary">
-                  {product.price.toLocaleString("en-IN")}
+                  {product.price.toLocaleString("en-IN", { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
                 </span>
               </div>
               {originalPrice > product.price && (
                 <div className="flex items-center gap-2 pb-0.5">
                   <span className="text-sm text-gray-400 line-through">
-                    ₹{originalPrice.toLocaleString("en-IN")}
+                    ₹{originalPrice.toLocaleString("en-IN", { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
                   </span>
                   <span className="rounded-md bg-red-50 px-2 py-0.5 text-xs font-bold text-red-600">
                     {discount}% off
@@ -361,7 +362,7 @@ export default async function ProductDetailsPage({ params }) {
         <ProductFAQ />
 
         {/* ── Recently viewed ──────────────────────────────────────────── */}
-        <RecentlyViewed currentProductId={id} />
+        <RecentlyViewed currentProductId={slug} />
 
         {/* ── Related products ─────────────────────────────────────────── */}
         <section className="mt-10 mb-6 md:mt-14">
@@ -384,7 +385,7 @@ export default async function ProductDetailsPage({ params }) {
               return (
                 <Link
                   key={item.id}
-                  href={`/products/${item.id}`}
+                  href={`/products/${item.slug ?? item.id}`}
                   className="group flex flex-col overflow-hidden rounded-2xl border border-gray-100 bg-white shadow-sm transition-all duration-300 hover:-translate-y-1 hover:border-gray-200 hover:shadow-lg cursor-pointer"
                 >
                   <div className="relative overflow-hidden bg-gray-50">
@@ -412,11 +413,11 @@ export default async function ProductDetailsPage({ params }) {
                     </h3>
                     <div className="mt-auto flex items-baseline gap-1.5 pt-1">
                       <span className="text-base font-bold text-primary">
-                        ₹{item.price.toLocaleString("en-IN")}
+                        ₹{item.price.toLocaleString("en-IN", { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
                       </span>
                       {itemOriginal > item.price && (
                         <span className="text-xs text-gray-400 line-through">
-                          ₹{itemOriginal.toLocaleString("en-IN")}
+                          ₹{itemOriginal.toLocaleString("en-IN", { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
                         </span>
                       )}
                     </div>

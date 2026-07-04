@@ -1,4 +1,4 @@
-import { USE_MOCK, MOCK_DELAY_MS, delay, apiGet } from "./client";
+import { USE_MOCK, MOCK_DELAY_MS, delay, apiGet, ApiError } from "./client";
 import data from "@/lib/data/products.json";
 
 // ─── Synchronous helpers ──────────────────────────────────────────────────────
@@ -9,6 +9,10 @@ export function getProducts() {
 
 export function getProductById(id) {
   return getProducts().find((p) => p.id === id) ?? null;
+}
+
+export function getProductBySlug(slug) {
+  return getProducts().find((p) => p.slug === slug) ?? null;
 }
 
 export function getProductsByCategory(category) {
@@ -80,6 +84,70 @@ export function searchProducts(query) {
   );
 }
 
+// ─── API → UI shape mappers ─────────────────────────────────────────────────────
+// The backend speaks paise and DB column names; the UI components expect rupees and
+// the field names established by the mock catalog. These adapters bridge the two so
+// the rest of the app stays unchanged.
+
+function paiseToRupees(paise) {
+  return paise != null ? Number(paise) / 100 : 0;
+}
+
+/** Maps a `GET /products` list item to the card/grid product shape. */
+function mapApiListProduct(raw) {
+  return {
+    id: raw.id,
+    slug: raw.slug,
+    name: raw.name,
+    description: raw.description ?? "",
+    price: paiseToRupees(raw.minPricePaise),
+    originalPrice: null,
+    image: raw.primaryImage ?? null,
+    images: raw.primaryImage ? [raw.primaryImage] : [],
+    rating: null,                       // backend has no ratings yet
+    reviewsCount: 0,
+    badge: null,
+    brand: null,
+    category: raw.categoryName ?? "",
+    routeCategory: raw.categorySlug ?? "",
+    inStock: raw.minPricePaise != null, // min-price subquery only counts in-stock supply
+    supplierProductId: raw.defaultSupplierProductId ?? null, // cheapest in-stock listing — for add-to-cart
+    supplierCount: Number(raw.supplierCount ?? 0),
+    unitOfMeasure: raw.unitOfMeasure ?? null,
+    hsnCode: raw.hsnCode ?? null,
+    attributes: raw.attributes ?? null,
+  };
+}
+
+/** Maps `GET /products/{slug}` plus its listings to the detail-page product shape. */
+function mapApiDetailProduct(raw, listings = []) {
+  const cheapest = listings[0]; // backend returns listings sorted by price ascending
+  const images = Array.isArray(raw.images) ? raw.images.map((img) => img.url) : [];
+  return {
+    id: raw.id,
+    slug: raw.slug,
+    name: raw.name,
+    description: raw.description ?? "",
+    price: paiseToRupees(cheapest?.effectivePricePaise ?? cheapest?.pricePaise),
+    originalPrice: null,
+    image: images[0] ?? null,
+    images,
+    rating: null,
+    reviewsCount: 0,
+    badge: null,
+    brand: null,
+    category: raw.categoryName ?? "",
+    routeCategory: raw.categorySlug ?? "",
+    inStock: listings.length > 0,
+    supplierProductId: cheapest?.id ?? null, // cheapest listing — for add-to-cart
+    unitOfMeasure: raw.unitOfMeasure ?? null,
+    hsnCode: raw.hsnCode ?? null,
+    attributes: raw.attributes ?? null,
+    gst: raw.gst ?? null,
+    listings,
+  };
+}
+
 // ─── Async API ─────────────────────────────────────────────────────────────────
 
 export async function fetchProducts(filters = {}) {
@@ -112,22 +180,86 @@ export async function fetchProducts(filters = {}) {
 
     return { products, total: products.length };
   }
-  return apiGet("/products", filters);
+
+  // Live: the backend paginates server-side and exposes only category/city filters,
+  // so we pull a generous page and let the page apply search/sort/filters client-side.
+  const res = await apiGet("/products", { city: "delhi-ncr", limit: 100, ...filters });
+  const products = (res?.products ?? []).map(mapApiListProduct);
+  return { products, total: products.length };
 }
 
-export async function fetchProductById(id) {
+/**
+ * Homepage "Featured Products": curated picks (products.is_featured, set by
+ * migration/merchandising) from the live catalog. Falls back to the mock
+ * selection if the API is unreachable or nothing is flagged yet.
+ */
+export async function fetchFeaturedProducts(limit = 8) {
   if (USE_MOCK) {
     await delay(MOCK_DELAY_MS);
-    return getProductById(id);
+    return getDiverseFeaturedProducts(limit, 2);
   }
-  return apiGet(`/products/${encodeURIComponent(id)}`);
+  try {
+    const res = await apiGet("/products", { city: "delhi-ncr", featured: "true", limit });
+    const products = (res?.products ?? [])
+      .map(mapApiListProduct)
+      .filter((p) => p.inStock && p.image);
+    return products.length ? products : getDiverseFeaturedProducts(limit, 2);
+  } catch {
+    return getDiverseFeaturedProducts(limit, 2);
+  }
 }
 
-export async function fetchRelatedProducts(productId, { category, routeCategory, limit = 4 } = {}) {
+/**
+ * Homepage "Featured Essentials": recent in-stock catalog picks that aren't
+ * already in the Featured section (no view/sales data yet to rank by).
+ */
+export async function fetchEssentialProducts(n = 5) {
+  if (USE_MOCK) {
+    await delay(MOCK_DELAY_MS);
+    return getTopProducts(n);
+  }
+  try {
+    const [{ products }, featured] = await Promise.all([
+      fetchProducts({ limit: 40 }),
+      fetchFeaturedProducts(),
+    ]);
+    const featuredIds = new Set(featured.map((p) => p.id));
+    const picks = products
+      .filter((p) => p.inStock && p.image && !featuredIds.has(p.id))
+      .slice(0, n);
+    return picks.length ? picks : getTopProducts(n);
+  } catch {
+    return getTopProducts(n);
+  }
+}
+
+export async function fetchProductBySlug(slug) {
+  if (USE_MOCK) {
+    await delay(MOCK_DELAY_MS);
+    return getProductBySlug(slug) ?? getProductById(slug);
+  }
+
+  try {
+    const [product, listings] = await Promise.all([
+      apiGet(`/products/${encodeURIComponent(slug)}`),
+      apiGet(`/products/${encodeURIComponent(slug)}/listings`).catch(() => []),
+    ]);
+    return mapApiDetailProduct(product, listings ?? []);
+  } catch (err) {
+    // During the incremental migration the live catalog holds only a subset of
+    // products; fall back to the mock entry so links from not-yet-wired sections
+    // (homepage, DIY, search) keep resolving instead of 404ing.
+    if (err instanceof ApiError && err.status === 404) {
+      return getProductBySlug(slug) ?? getProductById(slug) ?? null;
+    }
+    throw err;
+  }
+}
+
+export async function fetchRelatedProducts(productId, { routeCategory, limit = 4 } = {}) {
   if (USE_MOCK) {
     await delay(MOCK_DELAY_MS);
     const all = getProducts();
-    // Prefer same routeCategory, then same category, then anything
     const sameRoute = all.filter(
       (p) => p.id !== productId && routeCategory && p.routeCategory === routeCategory
     );
@@ -136,5 +268,11 @@ export async function fetchRelatedProducts(productId, { category, routeCategory,
     );
     return [...sameRoute, ...fallback].slice(0, limit);
   }
-  return apiGet(`/products/${encodeURIComponent(productId)}/related`, { limit });
+
+  // No backend `/related` endpoint; derive from the live catalog instead.
+  const { products } = await fetchProducts();
+  const pool = products.filter((p) => p.id !== productId && p.slug !== productId);
+  const sameRoute = routeCategory ? pool.filter((p) => p.routeCategory === routeCategory) : [];
+  const rest = pool.filter((p) => !sameRoute.includes(p));
+  return [...sameRoute, ...rest].slice(0, limit);
 }

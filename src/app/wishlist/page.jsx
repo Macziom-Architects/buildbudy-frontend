@@ -9,12 +9,12 @@ import Footer from "@/components/layout/Footer";
 
 export default function WishlistPage() {
   const { wishlist, removeFromWishlist } = useWishlist();
-  const { addToCart, showToast } = useCart();
+  const { addToCart } = useCart();
 
-  function moveToCart(product) {
-    addToCart(product, 1);
-    removeFromWishlist(product.id);
-    showToast(`${product.name.split(" ").slice(0, 3).join(" ")} added to cart`);
+  // CartContext toasts the add itself; only drop the wishlist entry if the
+  // item actually made it into the cart.
+  async function moveToCart(product) {
+    if (await addToCart(product, 1)) removeFromWishlist(product.id);
   }
 
   return (
@@ -119,11 +119,11 @@ export default function WishlistPage() {
                         <div className="flex items-baseline gap-1.5 pb-3">
                           <span className="text-[11px] font-medium text-gray-500">₹</span>
                           <span className="text-lg font-bold text-gray-900">
-                            {price.toLocaleString("en-IN")}
+                            {price.toLocaleString("en-IN", { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
                           </span>
                           {originalPrice > price && (
                             <span className="text-xs text-gray-400 line-through">
-                              ₹{originalPrice.toLocaleString("en-IN")}
+                              ₹{originalPrice.toLocaleString("en-IN", { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
                             </span>
                           )}
                         </div>

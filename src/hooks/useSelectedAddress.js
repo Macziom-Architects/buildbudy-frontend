@@ -1,7 +1,7 @@
 "use client";
 
 import { useCallback, useEffect, useRef, useSyncExternalStore } from "react";
-import { getAddresses } from "@/lib/api/addresses";
+import { listAddresses } from "@/lib/api/addresses";
 
 const KEY = "bb_selected_address";
 
@@ -46,7 +46,7 @@ export function useSelectedAddress() {
   useEffect(() => {
     if (selectedAddress || fetchedDefaultRef.current) return;
     fetchedDefaultRef.current = true;
-    getAddresses()
+    listAddresses()
       .then((list) => {
         if (!list?.length) return;
         const def = list.find((a) => a.isDefault) ?? list[0];

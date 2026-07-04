@@ -1,6 +1,6 @@
 "use client";
 
-import { Suspense, useState } from "react";
+import { Suspense, useEffect, useState } from "react";
 import Link from "next/link";
 import { useSearchParams } from "next/navigation";
 import {
@@ -9,7 +9,7 @@ import {
 } from "lucide-react";
 import ProductGrid from "@/components/product/ProductGrid";
 import ProductFilters from "@/components/product/ProductFilters";
-import { getProducts } from "@/lib/api/products";
+import { fetchProducts } from "@/lib/api/products";
 import Footer from "@/components/layout/Footer";
 
 const POPULAR_SEARCHES = ["screw", "cement", "drill", "paint", "pipe", "handle", "tile"];
@@ -89,12 +89,23 @@ function Pagination({ currentPage, totalPages, setCurrentPage }) {
 function ProductsContent() {
   const searchParams   = useSearchParams();
   const searchQuery    = searchParams.get("search")?.trim() || "";
-  const [products]     = useState(() => getProducts());
+  const [products, setProducts]     = useState([]);
+  const [loading, setLoading]       = useState(true);
+  const [loadError, setLoadError]   = useState(null);
   const [pageState, setPageState]   = useState({ key: "", page: 1 });
   const [sortOption, setSortOption] = useState("popularity");
   const [isFilterOpen, setIsFilterOpen] = useState(false);
   const [filters, setFilters]           = useState(DEFAULT_FILTERS);
   const [draftFilters, setDraftFilters] = useState(DEFAULT_FILTERS);
+
+  useEffect(() => {
+    let active = true;
+    fetchProducts()
+      .then((res) => { if (active) setProducts(res.products ?? []); })
+      .catch((err) => { if (active) setLoadError(err); })
+      .finally(() => { if (active) setLoading(false); });
+    return () => { active = false; };
+  }, []);
 
   const handleFilterChange      = (k, v) => setFilters((p) => ({ ...p, [k]: v }));
   const handleDraftFilterChange = (k, v) => setDraftFilters((p) => ({ ...p, [k]: v }));
@@ -147,6 +158,29 @@ function ProductsContent() {
   const filterCount     = activeFilterCount(filters);
   const draftFilterCount = activeFilterCount(draftFilters);
 
+  if (loading) return <ProductsFallback />;
+
+  if (loadError) {
+    return (
+      <div className="flex min-h-[60vh] flex-col items-center justify-center bg-[#F5F6F8] px-6 text-center">
+        <div className="mb-5 flex h-16 w-16 items-center justify-center rounded-2xl bg-red-50">
+          <Search className="h-7 w-7 text-red-400" />
+        </div>
+        <h2 className="text-lg font-bold text-primary">Couldn’t load products</h2>
+        <p className="mt-2 max-w-sm text-sm leading-6 text-muted">
+          {loadError.message || "Something went wrong. Please try again."}
+        </p>
+        <button
+          type="button"
+          onClick={() => window.location.reload()}
+          className="mt-5 rounded-xl border border-gray-200 bg-white px-5 py-2 text-sm font-semibold text-primary transition hover:border-primary hover:bg-gray-50 cursor-pointer"
+        >
+          Retry
+        </button>
+      </div>
+    );
+  }
+
   return (
     <div className="flex min-h-screen flex-col bg-[#F5F6F8]">
 
@@ -177,7 +211,7 @@ function ProductsContent() {
             <p className="mt-1 text-sm text-muted">
               {sorted.length === 0
                 ? "No products found"
-                : `${sorted.length.toLocaleString("en-IN")} product${sorted.length === 1 ? "" : "s"}`}
+                : `${sorted.length.toLocaleString("en-IN", { minimumFractionDigits: 2, maximumFractionDigits: 2 })} product${sorted.length === 1 ? "" : "s"}`}
             </p>
           </div>
 

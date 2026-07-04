@@ -51,20 +51,22 @@ function OrderCard({ order }) {
       {/* Content */}
       <div className="flex-1 min-w-0">
         <div className="flex flex-wrap items-center gap-2 mb-1.5">
-          <span className="text-sm font-bold text-primary font-mono tracking-wide">{order.id}</span>
+          <span className="text-sm font-bold text-primary font-mono tracking-wide">{order.orderNumber ?? order.id}</span>
           <span className={`inline-flex items-center gap-1.5 text-[11px] font-semibold px-2.5 py-0.5 rounded-full ${cfg.bg} ${cfg.color}`}>
             <span className={`h-1.5 w-1.5 rounded-full ${cfg.dot}`} />
             {order.status}
           </span>
         </div>
         <p className="text-sm text-gray-700 truncate mb-1">
-          {order.items.map((i) => i.name).join(", ")}
+          {order.summary || order.items.map((i) => i.name).join(", ")}
         </p>
         <div className="flex flex-wrap items-center gap-3 text-xs text-muted">
           <span className="flex items-center gap-1">
             <Calendar className="h-3 w-3" /> {order.date}
           </span>
-          <span>{order.items.length} item{order.items.length !== 1 ? "s" : ""}</span>
+          {order.items.length > 0 && (
+            <span>{order.items.length} item{order.items.length !== 1 ? "s" : ""}</span>
+          )}
           {order.deliveryDate && order.status !== "Cancelled" && (
             <span className={order.status === "Delivered" ? "text-emerald-600 font-medium" : ""}>
               {order.status === "Delivered" ? `Delivered ${order.deliveryDate}` : `Expected by ${order.deliveryDate}`}
@@ -80,7 +82,7 @@ function OrderCard({ order }) {
 
       {/* Right side */}
       <div className="flex sm:flex-col items-center sm:items-end justify-between sm:justify-center gap-3 flex-shrink-0">
-        <p className="text-base font-bold text-primary">₹{order.total.toLocaleString("en-IN")}</p>
+        <p className="text-base font-bold text-primary">₹{order.total.toLocaleString("en-IN", { minimumFractionDigits: 2, maximumFractionDigits: 2 })}</p>
         <div className="flex items-center gap-1.5">
           <span className="hidden sm:block text-xs font-medium text-muted group-hover:text-accent transition-colors">Details</span>
           <ChevronRight className="h-4 w-4 text-gray-400 group-hover:text-primary transition-colors" />

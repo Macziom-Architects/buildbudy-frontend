@@ -303,7 +303,7 @@ export default function SearchBar({
                     <div className="flex-1 min-w-0">
                       <p className="text-sm font-medium text-primary truncate">{product.name}</p>
                       <p className="text-xs text-muted">
-                        ₹{Number(product.price || 0).toLocaleString("en-IN")}
+                        ₹{Number(product.price || 0).toLocaleString("en-IN", { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
                       </p>
                     </div>
                   </button>

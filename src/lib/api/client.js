@@ -65,7 +65,7 @@ export function setToken(token) {
  * @param {{ body?: unknown, params?: Record<string,string|number>, token?: string|null }} [opts]
  */
 async function request(method, path, { body, params, token } = {}) {
-  const url = new URL(`${BASE_URL}/api${path}`);
+  const url = new URL(`${BASE_URL}/api/v1${path}`);
   if (params) {
     Object.entries(params).forEach(([k, v]) => {
       if (v != null) url.searchParams.set(k, String(v));
@@ -93,6 +93,23 @@ async function request(method, path, { body, params, token } = {}) {
     if (!res.ok) {
       let errorBody = null;
       try { errorBody = await res.json(); } catch {}
+      if (res.status === 401 && resolvedToken && typeof window !== "undefined") {
+        // The stored session is dead (expired token, or one signed by a
+        // different backend). Clear it and restart at login — mirrors
+        // logout() in lib/api/auth.js, inlined here because auth.js
+        // imports this module. `resolvedToken` guards the OTP endpoints:
+        // their 401s (wrong code) are called with token:null and must
+        // surface to the form instead.
+        try {
+          localStorage.removeItem("bb_auth_token");
+          localStorage.removeItem("bb_logged_in");
+          localStorage.removeItem("bb_user_profile");
+          window.dispatchEvent(new Event("storage"));
+        } catch {}
+        if (!window.location.pathname.startsWith("/auth")) {
+          window.location.assign("/auth/login");
+        }
+      }
       throw new ApiError(
         res.status,
         errorBody?.message ?? res.statusText,

@@ -8,10 +8,45 @@ import {
   useMemo,
   useState,
 } from "react";
-import { ShoppingCart, CheckCircle, AlertCircle, X } from "lucide-react";
+import { useRouter } from "next/navigation";
+import { CheckCircle, AlertCircle, X } from "lucide-react";
+import * as cartApi from "@/lib/api/cart";
 
 const CartContext = createContext(null);
-const CART_STORAGE_KEY = "buildbudy_cart";
+
+function isLoggedIn() {
+  try {
+    return typeof window !== "undefined" && !!localStorage.getItem("bb_logged_in");
+  } catch {
+    return false;
+  }
+}
+
+/**
+ * Normalise the backend CartItem into the shape the UI already consumes
+ * ({ id, name, price, image, quantity, ... }), while keeping the backend
+ * identifiers around. `id` is the supplierProductId — the key the cart API
+ * uses for update/remove — so existing callers of updateQuantity(id)/
+ * removeFromCart(id) keep working unchanged.
+ */
+function normalize(items) {
+  return (items || []).map((it) => ({
+    id: it.supplierProductId,
+    supplierProductId: it.supplierProductId,
+    productId: it.productId,
+    name: it.productName,
+    slug: it.productSlug,
+    price: (it.pricePaise ?? 0) / 100,
+    pricePaise: it.pricePaise ?? 0,
+    gstRatePct: it.gstRatePct ?? 0,
+    image: it.primaryImageUrl || null,
+    quantity: it.quantity,
+    availableStock: it.availableStock,
+    minOrderQuantity: it.minOrderQuantity,
+    supplierName: it.supplierName,
+    category: it.supplierName || "",
+  }));
+}
 
 function CartToast({ toasts, onDismiss }) {
   if (!toasts.length) return null;
@@ -48,21 +83,11 @@ function CartToast({ toasts, onDismiss }) {
 }
 
 export function CartProvider({ children }) {
-  const [cartItems, setCartItems] = useState(() => {
-    if (typeof window === "undefined") return [];
-    try {
-      const stored = localStorage.getItem(CART_STORAGE_KEY);
-      return stored ? JSON.parse(stored) : [];
-    } catch {
-      return [];
-    }
-  });
+  const router = useRouter();
 
+  const [cartItems, setCartItems] = useState([]);
+  const [loading, setLoading] = useState(false);
   const [toasts, setToasts] = useState([]);
-
-  useEffect(() => {
-    localStorage.setItem(CART_STORAGE_KEY, JSON.stringify(cartItems));
-  }, [cartItems]);
 
   const dismissToast = useCallback((id) => {
     setToasts((prev) => prev.filter((t) => t.id !== id));
@@ -76,54 +101,105 @@ export function CartProvider({ children }) {
     }, 3000);
   }, []);
 
-  const addToCart = useCallback((product, quantity = 1) => {
-    const itemQuantity = Math.max(1, Number(quantity) || 1);
-    setCartItems((current) => {
-      const existing = current.find((item) => item.id === product.id);
-      if (existing) {
-        return current.map((item) =>
-          item.id === product.id
-            ? { ...item, quantity: item.quantity + itemQuantity }
-            : item,
-        );
-      }
-      return [
-        ...current,
-        {
-          id: product.id,
-          name: product.name,
-          price: product.price,
-          image: product.image,
-          category: product.category,
-          quantity: itemQuantity,
-        },
-      ];
-    });
+  // Load the cart from the server when logged in; empty it when logged out.
+  // The cart itself lives in Redis per-user, so logout just clears local state —
+  // the server cart is restored on next login.
+  const refreshCart = useCallback(async () => {
+    if (!isLoggedIn()) {
+      setCartItems([]);
+      return;
+    }
+    try {
+      setLoading(true);
+      const items = await cartApi.getCart();
+      setCartItems(normalize(items));
+    } catch {
+      // leave the current items in place on a transient failure
+    } finally {
+      setLoading(false);
+    }
   }, []);
 
-  const removeFromCart = useCallback((id) => {
-    setCartItems((current) => current.filter((item) => item.id !== id));
-  }, []);
+  // Initial load + react to login/logout (both dispatch a "storage" event).
+  // The initial fetch is deferred so it doesn't set state synchronously during
+  // the effect (avoids cascading renders).
+  useEffect(() => {
+    let cancelled = false;
+    queueMicrotask(() => { if (!cancelled) refreshCart(); });
+    window.addEventListener("storage", refreshCart);
+    return () => {
+      cancelled = true;
+      window.removeEventListener("storage", refreshCart);
+    };
+  }, [refreshCart]);
 
-  const updateQuantity = useCallback(
-    (id, quantity) => {
-      const qty = Math.max(0, Number(quantity) || 0);
-      if (qty === 0) { removeFromCart(id); return; }
-      setCartItems((current) =>
-        current.map((item) => (item.id === id ? { ...item, quantity: qty } : item)),
-      );
-    },
-    [removeFromCart],
+  // Returns true when the item landed in the cart, so callers can decide
+  // whether to navigate (e.g. detail page pushes to /cart only on success).
+  const addToCart = useCallback(async (product, quantity = 1) => {
+    if (!isLoggedIn()) {
+      showToast("Please log in to add items to your cart", "error");
+      router.push("/auth/login");
+      return false;
+    }
+    const supplierProductId = product?.supplierProductId;
+    if (!supplierProductId) {
+      // Mock catalog products don't carry a supplier listing id yet — this works
+      // once products are served from the DB.
+      showToast("This product isn't available for ordering yet", "error");
+      return false;
+    }
+    try {
+      const items = await cartApi.addToCart(supplierProductId, Math.max(1, Number(quantity) || 1));
+      setCartItems(normalize(items));
+      showToast("Added to cart");
+      return true;
+    } catch (err) {
+      showToast(err?.message || "Could not add to cart", "error");
+      return false;
+    }
+  }, [router, showToast]);
+
+  const removeFromCart = useCallback(async (supplierProductId) => {
+    try {
+      const items = await cartApi.removeFromCart(supplierProductId);
+      setCartItems(normalize(items));
+    } catch (err) {
+      showToast(err?.message || "Could not remove item", "error");
+    }
+  }, [showToast]);
+
+  const updateQuantity = useCallback(async (supplierProductId, quantity) => {
+    const qty = Math.max(0, Number(quantity) || 0);
+    try {
+      const items = qty === 0
+        ? await cartApi.removeFromCart(supplierProductId)
+        : await cartApi.updateCartItem(supplierProductId, qty);
+      setCartItems(normalize(items));
+    } catch (err) {
+      showToast(err?.message || "Could not update quantity", "error");
+    }
+  }, [showToast]);
+
+  const clearCart = useCallback(async () => {
+    try {
+      await cartApi.clearCart();
+      setCartItems([]);
+    } catch (err) {
+      showToast(err?.message || "Could not clear cart", "error");
+    }
+  }, [showToast]);
+
+  // Quantity of a listing already in the cart (0 when absent) — lets product
+  // surfaces swap the Add-to-Cart button for a +/- stepper.
+  const getQuantity = useCallback(
+    (supplierProductId) =>
+      cartItems.find((i) => i.id === supplierProductId)?.quantity ?? 0,
+    [cartItems],
   );
 
-  const clearCart = useCallback(() => {
-    setCartItems([]);
-    localStorage.removeItem(CART_STORAGE_KEY);
-  }, []);
-
   const value = useMemo(
-    () => ({ cartItems, addToCart, removeFromCart, updateQuantity, clearCart, showToast }),
-    [addToCart, cartItems, removeFromCart, updateQuantity, clearCart, showToast],
+    () => ({ cartItems, loading, addToCart, removeFromCart, updateQuantity, clearCart, showToast, refreshCart, getQuantity }),
+    [cartItems, loading, addToCart, removeFromCart, updateQuantity, clearCart, showToast, refreshCart, getQuantity],
   );
 
   return (

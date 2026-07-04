@@ -216,7 +216,7 @@ export default function Navbar() {
                   href="/auth/login"
                   className="text-sm font-semibold text-white border border-white/20 rounded-md px-4 py-2 hover:bg-white/10 transition-colors duration-150 cursor-pointer"
                 >
-                  Sign In
+                  Login
                 </Link>
                 <Link
                   href="/auth/signup"

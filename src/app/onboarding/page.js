@@ -6,15 +6,14 @@ import {
   Hammer, Wrench, Briefcase, Search,
   Home, Package, Zap,
   CheckCircle2, XCircle,
-  MapPin, CheckCircle, User,
+  MapPin, CheckCircle, Loader2,
 } from "lucide-react";
-import { useAuth } from "@/hooks/useAuth";
+import { getProfile, updateProfile } from "@/lib/api/auth";
 import { createAddress } from "@/lib/api/addresses";
-import { INDIAN_STATES } from "@/lib/indianStates";
 
-const PREFERENCE_STEPS = [
+const STEPS = [
   {
-    id: 2,
+    id: 1,
     title: "What are you building?",
     type: "single",
     key: "project",
@@ -26,7 +25,7 @@ const PREFERENCE_STEPS = [
     ],
   },
   {
-    id: 3,
+    id: 2,
     title: "What are you looking for?",
     type: "multi",
     key: "needs",
@@ -39,7 +38,7 @@ const PREFERENCE_STEPS = [
     ],
   },
   {
-    id: 4,
+    id: 3,
     title: "Need professional help?",
     type: "single",
     key: "help",
@@ -49,46 +48,155 @@ const PREFERENCE_STEPS = [
     ],
   },
   {
-    id: 5,
+    id: 4,
     title: "Set your location",
     type: "location",
     key: "location",
   },
 ];
 
-const TOTAL_STEPS = 5;
-const INITIAL_PREFS = { project: null, needs: [], help: null, location: null };
+const INITIAL = { project: null, needs: [], help: null, location: null };
+
+const EMAIL_RE = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
 
 export default function OnboardingPage() {
   const router = useRouter();
-  const { isLoggedIn, user, completeOnboarding } = useAuth();
   const [step, setStep] = useState(1);
-  const [name, setName] = useState("");
-  const [nameError, setNameError] = useState("");
-  const [answers, setAnswers] = useState(INITIAL_PREFS);
-  const [address, setAddress] = useState("");
+  const [answers, setAnswers] = useState(INITIAL);
   const [city, setCity] = useState("");
   const [pincode, setPincode] = useState("");
-  const [state, setState] = useState("");
+  const [addressLine, setAddressLine] = useState("");
   const [locating, setLocating] = useState(false);
   const [done, setDone] = useState(false);
 
-  useEffect(() => {
-    if (!isLoggedIn) router.replace("/auth/login");
-  }, [isLoggedIn, router]);
+  // ── Identity step (name + email, both required) ──────────────────────────────
+  const [identityDone, setIdentityDone] = useState(false);
+  const [fullName, setFullName] = useState("");
+  const [email, setEmail] = useState("");
+  const [savingIdentity, setSavingIdentity] = useState(false);
+  const [identityError, setIdentityError] = useState("");
+  const [checking, setChecking] = useState(true);
 
-  const currentPrefStep = PREFERENCE_STEPS.find((s) => s.id === step);
+  // Gate the page on auth, then skip the identity step if the profile already
+  // has name + email (signup collects them, so those users go straight to the
+  // preferences quiz; a new user who came via login still gets asked here).
+  useEffect(() => {
+    if (!localStorage.getItem("bb_logged_in")) {
+      router.replace("/auth/login");
+      return;
+    }
+    getProfile()
+      .then((u) => {
+        if (u?.fullName) setFullName(u.fullName);
+        if (u?.email) setEmail(u.email);
+        if (u?.fullName && u?.email) setIdentityDone(true);
+      })
+      .catch(() => {})
+      .finally(() => setChecking(false));
+  }, [router]);
+
+  if (checking) {
+    return (
+      <main className="h-screen flex items-center justify-center bg-background">
+        <Loader2 className="h-6 w-6 animate-spin text-accent" />
+      </main>
+    );
+  }
+
+  async function handleSaveIdentity(e) {
+    e.preventDefault();
+    setIdentityError("");
+
+    const name = fullName.trim();
+    const mail = email.trim();
+    if (name.length < 2) {
+      setIdentityError("Please enter your full name.");
+      return;
+    }
+    if (!EMAIL_RE.test(mail)) {
+      setIdentityError("Please enter a valid email address.");
+      return;
+    }
+
+    setSavingIdentity(true);
+    try {
+      await updateProfile({ fullName: name, email: mail });
+      setIdentityDone(true);
+    } catch (err) {
+      // Backend returns 400 "This email is already in use" on conflict.
+      setIdentityError(err?.message || "Could not save your details. Please try again.");
+    } finally {
+      setSavingIdentity(false);
+    }
+  }
+
+  // Identity screen comes first — collect name + email before the preferences quiz.
+  if (!identityDone) {
+    return (
+      <main className="h-screen flex items-center justify-center bg-background px-4 overflow-hidden">
+        <div className="w-full max-w-md bg-surface rounded-xl shadow-md p-8">
+          <h1 className="text-2xl font-bold text-primary mb-1">Welcome aboard!</h1>
+          <p className="text-sm text-muted mb-6">
+            Let&apos;s set up your account. Tell us your name and email.
+          </p>
+
+          <form onSubmit={handleSaveIdentity} className="flex flex-col gap-4">
+            <div className="flex flex-col gap-1">
+              <label className="text-sm font-medium text-primary">Full name</label>
+              <input
+                type="text"
+                value={fullName}
+                onChange={(e) => setFullName(e.target.value)}
+                required
+                placeholder="Asha Verma"
+                className="border border-gray-200 rounded-md px-3 py-2 text-sm text-primary placeholder:text-muted focus:outline-none focus:border-accent transition-colors"
+              />
+            </div>
+
+            <div className="flex flex-col gap-1">
+              <label className="text-sm font-medium text-primary">Email</label>
+              <input
+                type="email"
+                value={email}
+                onChange={(e) => setEmail(e.target.value)}
+                required
+                placeholder="you@example.com"
+                className="border border-gray-200 rounded-md px-3 py-2 text-sm text-primary placeholder:text-muted focus:outline-none focus:border-accent transition-colors"
+              />
+            </div>
+
+            {identityError && (
+              <p className="text-xs text-red-500 bg-red-50 border border-red-100 rounded-md px-3 py-2">
+                {identityError}
+              </p>
+            )}
+
+            <button
+              type="submit"
+              disabled={savingIdentity}
+              className="w-full bg-accent text-primary font-bold rounded-md px-4 py-2.5 hover:bg-accent/90 transition-colors disabled:opacity-60 flex items-center justify-center gap-2 cursor-pointer"
+            >
+              {savingIdentity && <Loader2 className="h-4 w-4 animate-spin" />}
+              {savingIdentity ? "Saving…" : "Continue"}
+            </button>
+          </form>
+        </div>
+      </main>
+    );
+  }
+
+  const current = STEPS[step - 1];
 
   function selectSingle(label) {
-    setAnswers((prev) => ({ ...prev, [currentPrefStep.key]: label }));
+    setAnswers((prev) => ({ ...prev, [current.key]: label }));
   }
 
   function toggleMulti(label) {
     setAnswers((prev) => {
-      const list = prev[currentPrefStep.key];
+      const list = prev[current.key];
       return {
         ...prev,
-        [currentPrefStep.key]: list.includes(label)
+        [current.key]: list.includes(label)
           ? list.filter((o) => o !== label)
           : [...list, label],
       };
@@ -96,8 +204,8 @@ export default function OnboardingPage() {
   }
 
   function isSelected(label) {
-    const val = answers[currentPrefStep.key];
-    return currentPrefStep.type === "multi" ? val.includes(label) : val === label;
+    const val = answers[current.key];
+    return current.type === "multi" ? val.includes(label) : val === label;
   }
 
   function detectLocation() {
@@ -116,70 +224,45 @@ export default function OnboardingPage() {
   }
 
   const canContinue = (() => {
-    if (step === 1) return name.trim().length >= 2;
-    if (!currentPrefStep) return false;
-    if (currentPrefStep.type === "single") return answers[currentPrefStep.key] !== null;
-    if (currentPrefStep.type === "multi")  return answers[currentPrefStep.key].length > 0;
-    if (currentPrefStep.type === "location") return true; // address is optional — always allowed to continue
+    if (!current) return false;
+    if (current.type === "single") return answers[current.key] !== null;
+    if (current.type === "multi")  return answers[current.key].length > 0;
+    if (current.type === "location") return !!answers.location || city.trim() !== "";
     return true;
   })();
 
   async function handleContinue() {
-    if (step === 1) {
-      if (name.trim().length < 2) {
-        setNameError("Please enter your full name.");
-        return;
-      }
-      setNameError("");
-      setStep(2);
-      return;
-    }
-
-    if (step === TOTAL_STEPS) {
-      const hasManualAddress = city.trim() || pincode.trim() || state || address.trim();
+    if (step === 4) {
       const loc =
         answers.location ||
-        (hasManualAddress
-          ? { address: address.trim(), city: city.trim(), pincode: pincode.trim(), state, type: "manual" }
-          : null);
-      const preferences = { ...answers, location: loc };
-      const phone = user?.phone || localStorage.getItem("bb_pending_phone") || "";
+        (city.trim() ? { city, pincode: pincode.trim(), type: "manual" } : null);
+      const final = { ...answers, location: loc };
+      localStorage.setItem("bb_onboarding", JSON.stringify(final));
 
-      try {
-        await completeOnboarding({ name: name.trim(), phone, preferences });
-      } catch {
-        // Gracefully continue even if the API call fails so the user isn't stuck
-      }
-
-      if (hasManualAddress && city.trim() && pincode.trim() && state) {
+      // Save a manually entered location as the account's default address so
+      // checkout has one ready to go. Best-effort — never blocks onboarding.
+      // The backend derives city/state from the pincode, so that's all we need.
+      if (pincode.trim().length === 6) {
         try {
           await createAddress({
             label: "Home",
-            name: name.trim(),
-            line1: address.trim() || "Address not specified",
-            line2: "",
-            city: city.trim(),
-            state,
+            line1: addressLine.trim() || "Address not specified",
             pincode: pincode.trim(),
-            phone,
             isDefault: true,
           });
         } catch {
-          // Non-blocking — user can add/edit addresses later from their profile
+          // Unserviceable pincode or network issue — user can add addresses
+          // later from their profile.
         }
       }
 
       setDone(true);
       return;
     }
-
     setStep((s) => s + 1);
   }
 
-  function handleSkip() {
-    router.push("/");
-  }
-
+  // Success screen
   if (done) {
     return (
       <main className="min-h-screen flex items-center justify-center bg-background px-4 overflow-hidden">
@@ -187,15 +270,13 @@ export default function OnboardingPage() {
           <div className="flex justify-center mb-4">
             <CheckCircle className="h-14 w-14 text-accent" />
           </div>
-          <h1 className="text-2xl font-bold text-primary mb-2">
-            Welcome, {name.trim().split(" ")[0]}!
-          </h1>
+          <h1 className="text-2xl font-bold text-primary mb-2">You&apos;re all set!</h1>
           <p className="text-sm text-muted mb-8 max-w-xs mx-auto">
-            Your BuildBudy experience is personalised. Let&apos;s find what you need.
+            Your BuildBudy experience is personalized. Let&apos;s find what you need.
           </p>
           <button
             onClick={() => router.push("/")}
-            className="w-full bg-accent text-primary font-bold rounded-md px-4 py-2.5 hover:bg-accent/90 transition-colors cursor-pointer"
+            className="w-full bg-accent text-primary font-bold rounded-md px-4 py-2.5 hover:bg-accent/90 transition-colors"
           >
             Go to Home
           </button>
@@ -210,10 +291,10 @@ export default function OnboardingPage() {
         {/* Step indicator */}
         <div className="flex items-center gap-2 mb-3">
           <span className="text-xs font-semibold text-muted uppercase tracking-widest">
-            Step {step} of {TOTAL_STEPS}
+            Step {step} of 4
           </span>
           <div className="flex-1 flex gap-1">
-            {Array.from({ length: TOTAL_STEPS }, (_, i) => i + 1).map((s) => (
+            {[1, 2, 3, 4].map((s) => (
               <div
                 key={s}
                 className={`h-1 flex-1 rounded-full transition-colors ${
@@ -224,150 +305,112 @@ export default function OnboardingPage() {
           </div>
         </div>
 
-        {/* Step 1 — Name */}
-        {step === 1 && (
-          <>
-            <div className="flex items-center gap-3 mb-4">
-              <div className="h-10 w-10 rounded-xl bg-accent/10 flex items-center justify-center flex-shrink-0">
-                <User className="h-5 w-5 text-accent" />
-              </div>
-              <h1 className="text-lg font-bold text-primary">What should we call you?</h1>
-            </div>
-            <div className="flex flex-col gap-2">
-              <input
-                type="text"
-                value={name}
-                onChange={(e) => { setName(e.target.value); if (nameError) setNameError(""); }}
-                placeholder="Full Name"
-                autoFocus
-                className={`border rounded-xl px-4 py-3 text-sm text-primary placeholder:text-muted focus:outline-none focus:border-accent transition-colors ${
-                  nameError ? "border-red-400" : "border-gray-200"
-                }`}
-              />
-              {nameError && <p className="text-xs text-red-500">{nameError}</p>}
-              <p className="text-xs text-muted">
-                This is how we&apos;ll greet you across the app.
-              </p>
-            </div>
-          </>
-        )}
+        <h1 className="text-lg font-bold text-primary mb-4">{current.title}</h1>
 
-        {/* Steps 2–5 — Preference questions */}
-        {step > 1 && currentPrefStep && (
-          <>
-            <h1 className="text-lg font-bold text-primary mb-4">{currentPrefStep.title}</h1>
-
-            {(currentPrefStep.type === "single" || currentPrefStep.type === "multi") && (
-              <div className="grid grid-cols-2 gap-2.5">
-                {currentPrefStep.options.map(({ label, icon: Icon }) => {
-                  const selected = isSelected(label);
-                  return (
-                    <button
-                      key={label}
-                      onClick={() =>
-                        currentPrefStep.type === "single" ? selectSingle(label) : toggleMulti(label)
-                      }
-                      className={`flex items-center gap-2.5 border rounded-xl px-4 py-3 text-sm font-medium text-left transition-colors duration-150 cursor-pointer ${
-                        selected
-                          ? "bg-yellow-50 border-yellow-500 text-primary"
-                          : "border-gray-200 text-muted hover:border-yellow-400 hover:text-primary"
-                      }`}
-                    >
-                      <Icon
-                        className={`h-4 w-4 flex-shrink-0 ${selected ? "text-accent" : "text-gray-400"}`}
-                      />
-                      <span className="leading-tight">{label}</span>
-                    </button>
-                  );
-                })}
-              </div>
-            )}
-
-            {currentPrefStep.type === "location" && (
-              <div className="flex flex-col gap-3">
-                <p className="text-xs text-muted -mt-2">
-                  Optional — helps us show accurate delivery estimates. You can skip this and add it later from your profile.
-                </p>
-
+        {/* Select cards */}
+        {(current.type === "single" || current.type === "multi") && (
+          <div className="grid grid-cols-2 gap-2.5">
+            {current.options.map(({ label, icon: Icon }) => {
+              const selected = isSelected(label);
+              return (
                 <button
-                  onClick={detectLocation}
-                  disabled={locating}
-                  className={`flex items-center justify-center gap-2 w-full border-2 rounded-xl px-4 py-3 text-sm font-semibold transition-colors cursor-pointer ${
-                    answers.location?.type === "gps"
+                  key={label}
+                  onClick={() =>
+                    current.type === "single"
+                      ? selectSingle(label)
+                      : toggleMulti(label)
+                  }
+                  className={`flex items-center gap-2.5 border rounded-xl px-4 py-3 text-sm font-medium text-left transition-colors duration-150 ${
+                    selected
                       ? "bg-yellow-50 border-yellow-500 text-primary"
                       : "border-gray-200 text-muted hover:border-yellow-400 hover:text-primary"
                   }`}
                 >
-                  <MapPin className="h-4 w-4" />
-                  {locating
-                    ? "Detecting…"
-                    : answers.location?.type === "gps"
-                      ? "Location detected"
-                      : "Use my current location"}
+                  <Icon
+                    className={`h-4 w-4 flex-shrink-0 ${
+                      selected ? "text-accent" : "text-gray-400"
+                    }`}
+                  />
+                  <span className="leading-tight">{label}</span>
                 </button>
+              );
+            })}
+          </div>
+        )}
 
-                <div className="flex items-center gap-3 text-xs text-muted">
-                  <div className="flex-1 h-px bg-gray-200" />
-                  <span>or enter manually</span>
-                  <div className="flex-1 h-px bg-gray-200" />
-                </div>
+        {/* Location step */}
+        {current.type === "location" && (
+          <div className="flex flex-col gap-3">
+            <button
+              onClick={detectLocation}
+              disabled={locating}
+              className={`flex items-center justify-center gap-2 w-full border-2 rounded-xl px-4 py-3 text-sm font-semibold transition-colors ${
+                answers.location?.type === "gps"
+                  ? "bg-yellow-50 border-yellow-500 text-primary"
+                  : "border-gray-200 text-muted hover:border-yellow-400 hover:text-primary"
+              }`}
+            >
+              <MapPin className="h-4 w-4" />
+              {locating
+                ? "Detecting…"
+                : answers.location?.type === "gps"
+                  ? "Location detected"
+                  : "Use my current location"}
+            </button>
 
-                <input
-                  type="text"
-                  value={address}
-                  onChange={(e) => setAddress(e.target.value)}
-                  placeholder="Address (optional) — House no, street"
-                  className="border border-gray-200 rounded-md px-3 py-2 text-sm text-primary placeholder:text-muted focus:outline-none focus:border-accent transition-colors"
-                />
+            <div className="flex items-center gap-3 text-xs text-muted">
+              <div className="flex-1 h-px bg-gray-200" />
+              <span>or enter manually</span>
+              <div className="flex-1 h-px bg-gray-200" />
+            </div>
 
-                <div className="flex gap-2">
-                  <input
-                    type="text"
-                    value={pincode}
-                    onChange={(e) => setPincode(e.target.value.replace(/\D/g, "").slice(0, 6))}
-                    placeholder="Pincode"
-                    inputMode="numeric"
-                    maxLength={6}
-                    className="w-28 border border-gray-200 rounded-md px-3 py-2 text-sm text-primary placeholder:text-muted focus:outline-none focus:border-accent transition-colors"
-                  />
-                  <input
-                    type="text"
-                    value={city}
-                    onChange={(e) => setCity(e.target.value)}
-                    placeholder="City"
-                    className="flex-1 border border-gray-200 rounded-md px-3 py-2 text-sm text-primary placeholder:text-muted focus:outline-none focus:border-accent transition-colors"
-                  />
-                </div>
+            <input
+              type="text"
+              value={addressLine}
+              onChange={(e) => setAddressLine(e.target.value)}
+              placeholder="Address (optional) — House no, street"
+              className="border border-gray-200 rounded-md px-3 py-2 text-sm text-primary placeholder:text-muted focus:outline-none focus:border-accent transition-colors"
+            />
 
-                <select
-                  value={state}
-                  onChange={(e) => setState(e.target.value)}
-                  className="border border-gray-200 rounded-md px-3 py-2 text-sm text-primary focus:outline-none focus:border-accent transition-colors"
-                >
-                  <option value="">Select State (optional)</option>
-                  {INDIAN_STATES.map((s) => <option key={s} value={s}>{s}</option>)}
-                </select>
-              </div>
-            )}
-          </>
+            <div className="flex gap-2">
+              <input
+                type="text"
+                value={city}
+                onChange={(e) => setCity(e.target.value)}
+                placeholder="City"
+                className="flex-1 border border-gray-200 rounded-md px-3 py-2 text-sm text-primary placeholder:text-muted focus:outline-none focus:border-accent transition-colors"
+              />
+              <input
+                type="text"
+                value={pincode}
+                onChange={(e) => setPincode(e.target.value.replace(/\D/g, "").slice(0, 6))}
+                placeholder="Pincode"
+                inputMode="numeric"
+                maxLength={6}
+                className="w-28 border border-gray-200 rounded-md px-3 py-2 text-sm text-primary placeholder:text-muted focus:outline-none focus:border-accent transition-colors"
+              />
+            </div>
+          </div>
         )}
 
         {/* Footer */}
         <div className="mt-5 flex items-center justify-between">
           <button
-            onClick={handleSkip}
-            className="text-sm text-muted hover:text-primary transition-colors cursor-pointer"
+            onClick={() => router.push("/")}
+            className="text-sm text-muted hover:text-primary transition-colors"
           >
             Skip for now
           </button>
           <button
             onClick={handleContinue}
             disabled={!canContinue}
-            className={`bg-accent text-primary font-bold rounded-md px-6 py-2 text-sm transition-colors cursor-pointer ${
-              canContinue ? "hover:bg-accent/90" : "opacity-40 cursor-not-allowed"
+            className={`bg-accent text-primary font-bold rounded-md px-6 py-2 text-sm transition-colors ${
+              canContinue
+                ? "hover:bg-accent/90"
+                : "opacity-40 cursor-not-allowed"
             }`}
           >
-            {step === TOTAL_STEPS ? "Finish" : "Continue"}
+            Continue
           </button>
         </div>
       </div>

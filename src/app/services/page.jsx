@@ -205,7 +205,7 @@ export default function ServicesPage() {
                       <div>
                         <p className="text-[10px] text-muted uppercase tracking-wide">From</p>
                         <p className="text-base font-bold text-primary">
-                          ₹{service.startingFrom.toLocaleString("en-IN")}
+                          ₹{service.startingFrom.toLocaleString("en-IN", { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
                           {service.priceUnit && <span className="text-xs font-normal text-muted">{service.priceUnit}</span>}
                         </p>
                       </div>

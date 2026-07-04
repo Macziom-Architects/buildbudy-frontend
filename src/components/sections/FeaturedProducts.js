@@ -1,10 +1,10 @@
 import Link from "next/link";
 import { ArrowRight } from "lucide-react";
 import ProductCard from "@/components/product/ProductCard";
-import { getDiverseFeaturedProducts } from "@/lib/api/products";
+import { fetchFeaturedProducts } from "@/lib/api/products";
 
-export default function FeaturedProducts() {
-  const products = getDiverseFeaturedProducts(8, 2);
+export default async function FeaturedProducts() {
+  const products = await fetchFeaturedProducts(8);
 
   return (
     <section className="bg-white py-12 md:py-16">

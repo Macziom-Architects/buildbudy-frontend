@@ -536,7 +536,7 @@ export default function DIYArticlePage() {
                       {product.name}
                     </h3>
                     <p className="text-sm font-bold text-primary">
-                      ₹{price.toLocaleString("en-IN")}
+                      ₹{price.toLocaleString("en-IN", { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
                     </p>
                     <button
                       type="button"

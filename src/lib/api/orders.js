@@ -1,6 +1,82 @@
 import { USE_MOCK, MOCK_DELAY_MS, delay, apiGet, apiPost, apiPut } from "./client";
 import { MOCK_ORDERS } from "@/lib/ordersData";
 
+// ─── API → UI shape mappers ──────────────────────────────────────────────────────
+// Backend `GET /orders` returns { items, page, limit, total } with money in paise and
+// a lowercase status enum; map it onto the title-case status + rupee fields the UI uses.
+
+const ORDER_STATUS_MAP = {
+  pending: "Placed",
+  confirmed: "Packed",
+  partially_delivered: "Shipped",
+  delivered: "Delivered",
+  cancelled: "Cancelled",
+};
+
+function fmtDate(iso) {
+  return iso ? new Date(iso).toLocaleDateString("en-IN", { day: "numeric", month: "short", year: "numeric" }) : "";
+}
+
+// List item: GET /orders returns no line items (only a count), so `items` is empty and
+// `summary` carries the count for display.
+function mapApiOrder(raw) {
+  const itemCount = raw.itemCount ?? 0;
+  return {
+    id: raw.id,
+    orderNumber: raw.orderNumber,
+    status: ORDER_STATUS_MAP[raw.status] ?? "Placed",
+    total: (raw.totalPaise ?? 0) / 100,
+    itemCount,
+    items: [],
+    summary: `${itemCount} item${itemCount !== 1 ? "s" : ""}`,
+    deliveryDate: null,
+    cancelReason: null,
+    placedAt: raw.placedAt,
+    date: fmtDate(raw.placedAt),
+  };
+}
+
+// Detail: GET /orders/{id} → flatten subOrders[].items, paise→₹. The address is
+// location-only (no recipient name/phone — the buyer is the account holder).
+function mapApiOrderDetail(raw) {
+  if (!raw) return null;
+  const items = (raw.subOrders ?? []).flatMap((so) =>
+    (so.items ?? []).map((it) => ({
+      name: it.productNameSnapshot,
+      sku: it.hsnCode,
+      qty: it.quantity,
+      price: (it.unitPricePaise ?? 0) / 100,
+      image: it.primaryImage ?? null,
+      slug: it.productSlug ?? null,
+    }))
+  );
+  const a = raw.address ?? {};
+  const paid = ["confirmed", "partially_delivered", "delivered"].includes(raw.status);
+  return {
+    id: raw.id,
+    orderNumber: raw.orderNumber,
+    status: ORDER_STATUS_MAP[raw.status] ?? "Placed",
+    date: fmtDate(raw.placedAt),
+    subtotal: (raw.subtotalPaise ?? 0) / 100,
+    gst: (raw.gstAmountPaise ?? 0) / 100,
+    delivery: 0,
+    discount: (raw.discountPaise ?? 0) / 100,
+    coupon: null,
+    total: (raw.totalPaise ?? 0) / 100,
+    payment: { method: paid ? "Online" : "Payment", label: paid ? "Razorpay" : "Pending" },
+    address: {
+      name: null,
+      line1: a.line1 ?? "",
+      line2: a.line2 ?? "",
+      city: a.city ?? "",
+      state: a.state ?? "",
+      pincode: a.pincode ?? "",
+      phone: null,
+    },
+    items,
+  };
+}
+
 // ─── Orders API ────────────────────────────────────────────────────────────────
 
 /**
@@ -36,7 +112,23 @@ export async function getOrders(filters = {}) {
     return { orders, total: orders.length };
   }
 
-  return apiGet("/orders", filters);
+  const res = await apiGet("/orders", filters);
+  let orders = (res?.items ?? []).map(mapApiOrder);
+
+  // The backend doesn't filter by status/search, so apply it client-side (mirrors mock).
+  if (filters.status && filters.status !== "all") {
+    const active = ["Placed", "Packed", "Shipped", "Out for Delivery"];
+    orders = orders.filter((o) =>
+      filters.status === "active"    ? active.includes(o.status) :
+      filters.status === "delivered" ? o.status === "Delivered"  :
+      filters.status === "cancelled" ? o.status === "Cancelled"  : true
+    );
+  }
+  if (filters.search) {
+    const q = filters.search.toLowerCase();
+    orders = orders.filter((o) => (o.orderNumber ?? "").toLowerCase().includes(q));
+  }
+  return { orders, total: orders.length };
 }
 
 /**
@@ -48,7 +140,7 @@ export async function getOrderById(id) {
     await delay(MOCK_DELAY_MS);
     return MOCK_ORDERS.find((o) => o.id === id) ?? null;
   }
-  return apiGet(`/orders/${encodeURIComponent(id)}`);
+  return mapApiOrderDetail(await apiGet(`/orders/${encodeURIComponent(id)}`));
 }
 
 /**

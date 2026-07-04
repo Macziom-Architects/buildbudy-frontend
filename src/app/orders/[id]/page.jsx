@@ -120,7 +120,7 @@ function ItemsList({ items }) {
               <p className="text-xs text-muted">Qty: {item.qty}</p>
             </div>
             <p className="text-sm font-bold text-primary flex-shrink-0">
-              ₹{(item.price * item.qty).toLocaleString("en-IN")}
+              ₹{(item.price * item.qty).toLocaleString("en-IN", { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
             </p>
           </div>
         ))}
@@ -137,8 +137,14 @@ function PaymentSummary({ order }) {
       <div className="space-y-2.5">
         <div className="flex justify-between text-sm">
           <span className="text-muted">Subtotal</span>
-          <span className="font-medium">₹{order.subtotal.toLocaleString("en-IN")}</span>
+          <span className="font-medium">₹{order.subtotal.toLocaleString("en-IN", { minimumFractionDigits: 2, maximumFractionDigits: 2 })}</span>
         </div>
+        {order.gst > 0 && (
+          <div className="flex justify-between text-sm">
+            <span className="text-muted">GST</span>
+            <span className="font-medium">₹{order.gst.toLocaleString("en-IN", { minimumFractionDigits: 2, maximumFractionDigits: 2 })}</span>
+          </div>
+        )}
         <div className="flex justify-between text-sm">
           <span className="text-muted">Delivery</span>
           {order.delivery > 0
@@ -148,12 +154,12 @@ function PaymentSummary({ order }) {
         {order.discount > 0 && (
           <div className="flex justify-between text-sm">
             <span className="text-muted">Coupon{order.coupon ? ` (${order.coupon})` : ""}</span>
-            <span className="text-emerald-600 font-medium">−₹{order.discount.toLocaleString("en-IN")}</span>
+            <span className="text-emerald-600 font-medium">−₹{order.discount.toLocaleString("en-IN", { minimumFractionDigits: 2, maximumFractionDigits: 2 })}</span>
           </div>
         )}
         <div className="pt-2.5 border-t border-gray-100 flex justify-between">
           <span className="text-sm font-bold text-primary">Total Paid</span>
-          <span className="text-base font-bold text-primary">₹{order.total.toLocaleString("en-IN")}</span>
+          <span className="text-base font-bold text-primary">₹{order.total.toLocaleString("en-IN", { minimumFractionDigits: 2, maximumFractionDigits: 2 })}</span>
         </div>
         <div className="flex items-center gap-2 pt-1">
           <CreditCard className="h-3.5 w-3.5 text-muted flex-shrink-0" />
@@ -175,14 +181,16 @@ function ShippingAddress({ address }) {
           <Home className="h-4 w-4 text-primary" />
         </div>
         <div>
-          <p className="text-sm font-bold text-primary">{address.name}</p>
+          {address.name && <p className="text-sm font-bold text-primary">{address.name}</p>}
           <p className="text-xs text-muted mt-1 leading-relaxed">
             {address.line1}{address.line2 ? `, ${address.line2}` : ""}<br />
             {address.city}, {address.state} — {address.pincode}
           </p>
-          <p className="text-xs text-muted flex items-center gap-1 mt-1">
-            <Phone className="h-3 w-3" /> {address.phone}
-          </p>
+          {address.phone && (
+            <p className="text-xs text-muted flex items-center gap-1 mt-1">
+              <Phone className="h-3 w-3" /> {address.phone}
+            </p>
+          )}
         </div>
       </div>
     </Card>
@@ -282,7 +290,7 @@ export default function OrderDetailPage() {
             <div>
               <p className="text-[10px] font-bold uppercase tracking-[0.2em] text-accent mb-2">Order Details</p>
               <div className="flex items-center gap-2 flex-wrap">
-                <h1 className="text-xl font-bold text-white font-mono">{order.id}</h1>
+                <h1 className="text-xl font-bold text-white font-mono">{order.orderNumber ?? order.id}</h1>
                 <button onClick={copyId} className="text-white/40 hover:text-white/80 transition-colors cursor-pointer" title="Copy ID">
                   <Copy className="h-4 w-4" />
                 </button>

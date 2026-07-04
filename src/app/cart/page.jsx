@@ -1,11 +1,11 @@
 "use client";
 
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import SafeImage from "@/components/ui/SafeImage";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
 import {
-  ShoppingCart, Tag, X, CheckCircle2, Truck, ArrowRight, Minus, Plus,
+  ShoppingCart, X, CheckCircle2, Truck, ArrowRight, Minus, Plus,
 } from "lucide-react";
 import { useCart } from "@/context/CartContext";
 import Footer from "@/components/layout/Footer";
@@ -14,50 +14,33 @@ import { getProducts } from "@/lib/products";
 
 const recommended = getProducts().slice(0, 4);
 
-const VALID_COUPONS = {
-  BUILDBUDY10: 0.10,
-  FIRST20:     0.20,
-  SAVE5:       0.05,
-};
-
 function formatPrice(price) {
-  return `₹${price.toLocaleString("en-IN")}`;
+  return `₹${price.toLocaleString("en-IN", { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`;
 }
 
 export default function CartPage() {
   const router = useRouter();
   const { cartItems, removeFromCart, updateQuantity } = useCart();
 
-  const [couponInput, setCouponInput]     = useState("");
-  const [appliedCoupon, setAppliedCoupon] = useState(null);
-  const [couponError, setCouponError]     = useState("");
-
-  function applyCoupon() {
-    const code = couponInput.toUpperCase().trim();
-    if (VALID_COUPONS[code]) {
-      setAppliedCoupon({ code, rate: VALID_COUPONS[code] });
-      setCouponError("");
-      setCouponInput("");
-    } else {
-      setCouponError("Invalid code. Try BUILDBUDY10, FIRST20, or SAVE5");
+  // Cart is for logged-in users only — bounce guests to login.
+  useEffect(() => {
+    if (typeof window !== "undefined" && !localStorage.getItem("bb_logged_in")) {
+      router.replace("/auth/login");
     }
-  }
-
-  function removeCoupon() {
-    setAppliedCoupon(null);
-    setCouponError("");
-  }
+  }, [router]);
 
   function handleCheckout() {
-    const saved = typeof window !== "undefined" && localStorage.getItem("bb_address");
-    router.push(saved ? "/checkout/payment" : "/checkout/address");
+    router.push("/checkout/address");
   }
 
-  const subtotal   = cartItems.reduce((sum, item) => sum + item.price * item.quantity, 0);
-  const discount10 = subtotal * 0.1;
-  const couponDiscount = appliedCoupon ? subtotal * appliedCoupon.rate : 0;
-  const delivery   = subtotal > 999 ? 0 : 99;
-  const total      = subtotal - discount10 - couponDiscount + delivery;
+  // The backend is the source of truth for pricing (no client-side
+  // discounts/coupons — it has no coupon support yet).
+  // TODO(founder decision): taxes are intentionally NOT shown. Catalog prices
+  // are scraped retail prices (likely MRP = GST-inclusive) but the backend
+  // currently adds GST on top at checkout — possibly double taxation. Until
+  // the founders settle inclusive-vs-exclusive pricing, the summary shows the
+  // subtotal only.
+  const subtotal = cartItems.reduce((sum, item) => sum + item.price * item.quantity, 0);
 
   return (
     <>
@@ -110,7 +93,7 @@ export default function CartPage() {
                   >
                     {/* Image */}
                     <Link
-                      href={`/products/${item.id}`}
+                      href={`/products/${item.slug || item.id}`}
                       className="w-[88px] h-[88px] shrink-0 bg-gray-50 border border-gray-100 rounded-xl flex items-center justify-center hover:border-gray-200 transition-colors"
                     >
                       <SafeImage
@@ -124,7 +107,7 @@ export default function CartPage() {
 
                     {/* Info */}
                     <div className="flex-1 min-w-0">
-                      <Link href={`/products/${item.id}`}>
+                      <Link href={`/products/${item.slug || item.id}`}>
                         <h2 className="font-semibold text-primary text-[15px] leading-snug hover:underline line-clamp-2">
                           {item.name}
                         </h2>
@@ -176,59 +159,6 @@ export default function CartPage() {
                   </div>
                 ))}
 
-                {/* Coupon code */}
-                <div className="bg-white rounded-2xl border border-gray-100 shadow-sm p-4">
-                  <p className="flex items-center gap-2 text-sm font-bold text-primary mb-3">
-                    <Tag className="h-4 w-4 text-accent" />
-                    Promo Code
-                  </p>
-
-                  {appliedCoupon ? (
-                    <div className="flex items-center justify-between rounded-xl bg-emerald-50 border border-emerald-200 px-4 py-2.5">
-                      <div className="flex items-center gap-2">
-                        <CheckCircle2 className="h-4 w-4 text-emerald-600 flex-shrink-0" />
-                        <div>
-                          <p className="text-sm font-bold text-emerald-700">{appliedCoupon.code}</p>
-                          <p className="text-xs text-emerald-600">
-                            {Math.round(appliedCoupon.rate * 100)}% off applied — saving {formatPrice(couponDiscount)}
-                          </p>
-                        </div>
-                      </div>
-                      <button
-                        type="button"
-                        onClick={removeCoupon}
-                        className="text-emerald-500 hover:text-emerald-700 cursor-pointer transition-colors"
-                        aria-label="Remove coupon"
-                      >
-                        <X className="h-4 w-4" />
-                      </button>
-                    </div>
-                  ) : (
-                    <div className="space-y-2">
-                      <div className="flex gap-2">
-                        <input
-                          type="text"
-                          value={couponInput}
-                          onChange={(e) => { setCouponInput(e.target.value.toUpperCase()); setCouponError(""); }}
-                          onKeyDown={(e) => e.key === "Enter" && applyCoupon()}
-                          placeholder="Enter promo code"
-                          className="flex-1 rounded-lg border border-gray-200 px-3 py-2 text-sm text-primary placeholder:text-muted focus:border-accent focus:outline-none focus:ring-1 focus:ring-accent/30 transition-all"
-                        />
-                        <button
-                          type="button"
-                          onClick={applyCoupon}
-                          disabled={!couponInput.trim()}
-                          className="rounded-lg bg-primary px-4 py-2 text-sm font-bold text-white transition hover:bg-primary/90 disabled:opacity-50 cursor-pointer disabled:cursor-not-allowed"
-                        >
-                          Apply
-                        </button>
-                      </div>
-                      {couponError && (
-                        <p className="text-xs text-red-500">{couponError}</p>
-                      )}
-                    </div>
-                  )}
-                </div>
               </div>
 
               {/* ── RIGHT: Order summary ──────────────────────────────── */}
@@ -239,48 +169,16 @@ export default function CartPage() {
 
                 <div className="mt-3 space-y-2.5 text-sm">
                   <div className="flex justify-between items-center">
-                    <span className="text-gray-400">
-                      Subtotal ({cartItems.reduce((s, i) => s + i.quantity, 0)} items)
-                    </span>
-                    <span className="font-medium">{formatPrice(subtotal)}</span>
-                  </div>
-
-                  <div className="flex justify-between items-center">
-                    <span className="text-gray-400">Discount (10%)</span>
-                    <span className="text-green-400 font-medium">−{formatPrice(discount10)}</span>
-                  </div>
-
-                  {appliedCoupon && (
-                    <div className="flex justify-between items-center">
-                      <span className="text-gray-400 flex items-center gap-1.5">
-                        <Tag className="h-3 w-3 text-accent" />
-                        {appliedCoupon.code}
-                      </span>
-                      <span className="text-green-400 font-medium">−{formatPrice(couponDiscount)}</span>
-                    </div>
-                  )}
-
-                  <div className="flex justify-between items-center">
                     <span className="text-gray-400 flex items-center gap-1.5">
                       <Truck className="h-3 w-3" />
                       Delivery
                     </span>
-                    <span className="font-medium">
-                      {delivery === 0
-                        ? <span className="text-green-400">Free</span>
-                        : formatPrice(delivery)}
-                    </span>
+                    <span className="text-green-400 font-medium">Free</span>
                   </div>
 
-                  {subtotal <= 999 && (
-                    <p className="text-[11px] text-gray-500">
-                      Add {formatPrice(999 - subtotal)} more for free delivery
-                    </p>
-                  )}
-
                   <div className="border-t border-white/10 pt-3 flex justify-between items-center font-bold text-base">
-                    <span>Total</span>
-                    <span className="text-accent text-lg">{formatPrice(total)}</span>
+                    <span>Subtotal ({cartItems.reduce((s, i) => s + i.quantity, 0)} items)</span>
+                    <span className="text-accent text-lg">{formatPrice(subtotal)}</span>
                   </div>
                 </div>
 

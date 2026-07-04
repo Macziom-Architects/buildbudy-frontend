@@ -110,7 +110,7 @@ function StepService({ selected, onSelect }) {
                 </div>
                 <p className="text-xs text-muted mt-0.5 leading-snug">{desc}</p>
                 <p className="text-xs font-semibold text-accent mt-1">
-                  From ₹{from.toLocaleString("en-IN")}{id === "painting" ? "/sq ft" : ""}
+                  From ₹{from.toLocaleString("en-IN", { minimumFractionDigits: 2, maximumFractionDigits: 2 })}{id === "painting" ? "/sq ft" : ""}
                 </p>
               </div>
             </button>

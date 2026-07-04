@@ -2,7 +2,7 @@
 
 import { useEffect, useState } from "react";
 import { X, Home, Building2, MapPin, CheckCircle2, Plus, Loader2 } from "lucide-react";
-import { getAddresses, createAddress } from "@/lib/api/addresses";
+import { listAddresses, createAddress } from "@/lib/api/addresses";
 import { useSelectedAddress } from "@/hooks/useSelectedAddress";
 import AddressFormModal from "@/components/shared/AddressFormModal";
 
@@ -38,7 +38,7 @@ export default function LocationPickerModal({ open, onClose }) {
   useEffect(() => {
     if (!open) return;
     let cancelled = false;
-    getAddresses()
+    listAddresses()
       .then((list) => { if (!cancelled) setAddresses(list ?? []); })
       .catch(() => { if (!cancelled) setAddresses([]); })
       .finally(() => { if (!cancelled) setLoading(false); });
