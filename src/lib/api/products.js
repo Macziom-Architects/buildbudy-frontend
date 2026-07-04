@@ -84,6 +84,51 @@ export function searchProducts(query) {
   );
 }
 
+/** Maps an OpenSearch hit (GET /search item) to the card/grid product shape. */
+function mapSearchHit(hit) {
+  const src = hit?._source ?? {};
+  return {
+    id: src.product_id,
+    slug: src.slug,
+    name: src.name ?? "",
+    description: src.description ?? "",
+    price: paiseToRupees(src.price_paise),
+    originalPrice: null,
+    image: src.primary_image ?? null,
+    images: src.primary_image ? [src.primary_image] : [],
+    rating: null,
+    reviewsCount: 0,
+    badge: null,
+    brand: null,
+    category: src.category_name ?? "",
+    routeCategory: src.category_slug ?? "",
+    inStock: (src.stock_available ?? 0) > 0,
+    supplierProductId: hit?._id ?? null, // the index is keyed by listing id — add-to-cart ready
+    supplierCount: 1,
+    unitOfMeasure: src.unit_of_measure ?? null,
+    hsnCode: src.hsn_code ?? null,
+    attributes: src.attributes ?? null,
+  };
+}
+
+/**
+ * Full-catalog search via the backend's OpenSearch endpoint (GET /search).
+ * Unlike fetchProducts (one page of the listing), this ranks across the whole
+ * catalog with fuzzy matching.
+ */
+export async function searchCatalog(query, { page = 1, limit = 40 } = {}) {
+  const q = (query ?? "").trim();
+  if (!q) return { products: [], total: 0 };
+  if (USE_MOCK) {
+    await delay(MOCK_DELAY_MS);
+    const products = searchProducts(q);
+    return { products, total: products.length };
+  }
+  const res = await apiGet("/search", { q, city: "delhi-ncr", page, limit });
+  const products = (res?.items ?? []).map(mapSearchHit);
+  return { products, total: res?.total ?? products.length };
+}
+
 // ─── API → UI shape mappers ─────────────────────────────────────────────────────
 // The backend speaks paise and DB column names; the UI components expect rupees and
 // the field names established by the mock catalog. These adapters bridge the two so

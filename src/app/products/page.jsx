@@ -9,7 +9,7 @@ import {
 } from "lucide-react";
 import ProductGrid from "@/components/product/ProductGrid";
 import ProductFilters from "@/components/product/ProductFilters";
-import { fetchProducts } from "@/lib/api/products";
+import { fetchProducts, searchCatalog } from "@/lib/api/products";
 import Footer from "@/components/layout/Footer";
 
 const POPULAR_SEARCHES = ["screw", "cement", "drill", "paint", "pipe", "handle", "tile"];
@@ -100,12 +100,18 @@ function ProductsContent() {
 
   useEffect(() => {
     let active = true;
-    fetchProducts()
+    setLoading(true);
+    // A search query goes through the OpenSearch endpoint (whole catalog,
+    // fuzzy-ranked); plain browsing pulls the product listing.
+    const fetcher = searchQuery
+      ? searchCatalog(searchQuery, { limit: 60 })
+      : fetchProducts();
+    fetcher
       .then((res) => { if (active) setProducts(res.products ?? []); })
       .catch((err) => { if (active) setLoadError(err); })
       .finally(() => { if (active) setLoading(false); });
     return () => { active = false; };
-  }, []);
+  }, [searchQuery]);
 
   const handleFilterChange      = (k, v) => setFilters((p) => ({ ...p, [k]: v }));
   const handleDraftFilterChange = (k, v) => setDraftFilters((p) => ({ ...p, [k]: v }));

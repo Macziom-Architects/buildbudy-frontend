@@ -3,7 +3,7 @@
 import { useMemo, useState, useEffect, useRef, useCallback } from "react";
 import { useRouter } from "next/navigation";
 import { Search, Clock, TrendingUp, Tag, X, ChevronRight } from "lucide-react";
-import { getProducts } from "@/lib/api/products";
+import { searchCatalog } from "@/lib/api/products";
 
 const TRENDING = [
   "OPC Cement",
@@ -68,19 +68,24 @@ export default function SearchBar({
   const wrapperRef = useRef(null);
 
   const isDark = variant === "dark";
-  const allProducts = useMemo(() => getProducts(), []);
   const q = query.trim().toLowerCase();
   const hasQ = q.length >= 2;
 
-  const productHits = useMemo(() => {
-    if (!hasQ) return [];
-    return allProducts
-      .filter((p) =>
-        p.name.toLowerCase().includes(q) ||
-        (p.category && p.category.toLowerCase().includes(q))
-      )
-      .slice(0, 5);
-  }, [allProducts, q, hasQ]);
+  // Live product suggestions from the search API (debounced). searchCatalog
+  // falls back to the mock catalog when no backend is configured.
+  const [productHits, setProductHits] = useState([]);
+  useEffect(() => {
+    if (!hasQ) {
+      setProductHits([]);
+      return;
+    }
+    const t = setTimeout(() => {
+      searchCatalog(q, { limit: 5 })
+        .then((res) => setProductHits((res.products ?? []).slice(0, 5)))
+        .catch(() => setProductHits([]));
+    }, 250);
+    return () => clearTimeout(t);
+  }, [q, hasQ]);
 
   const categoryHits = useMemo(() => {
     if (!hasQ) return [];
@@ -120,7 +125,7 @@ export default function SearchBar({
       } else if (item.type === "product") {
         persistRecent(item.name);
         closeDropdown();
-        router.push(`/products/${item.id}`);
+        router.push(`/products/${item.slug ?? item.id}`);
       } else {
         persistRecent(item.value);
         closeDropdown();
