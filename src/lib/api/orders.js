@@ -5,9 +5,11 @@ import { MOCK_ORDERS } from "@/lib/ordersData";
 // Backend `GET /orders` returns { items, page, limit, total } with money in paise and
 // a lowercase status enum; map it onto the title-case status + rupee fields the UI uses.
 
+// `pending` means the order was created but Razorpay payment never completed
+// (abandoned checkout) — it must NOT render as a successfully placed order.
 const ORDER_STATUS_MAP = {
-  pending: "Placed",
-  confirmed: "Packed",
+  pending: "Payment Pending",
+  confirmed: "Placed",
   partially_delivered: "Shipped",
   delivered: "Delivered",
   cancelled: "Cancelled",

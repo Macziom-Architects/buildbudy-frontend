@@ -15,6 +15,7 @@ import { STATUS_CONFIG } from "@/lib/ordersData";
 // ─── Status icon map ───────────────────────────────────────────────────────────
 
 const STATUS_ICONS = {
+  "Payment Pending":  Clock,
   "Placed":           Clock,
   "Packed":           Package,
   "Shipped":          Truck,

@@ -135,6 +135,7 @@ export const MOCK_ORDERS = [
 ];
 
 export const STATUS_CONFIG = {
+  "Payment Pending":  { color: "text-amber-700",   bg: "bg-amber-50",   border: "border-amber-300",   dot: "bg-amber-500"   },
   "Placed":           { color: "text-blue-600",    bg: "bg-blue-50",    border: "border-blue-200",    dot: "bg-blue-500"    },
   "Packed":           { color: "text-amber-600",   bg: "bg-amber-50",   border: "border-amber-200",   dot: "bg-amber-500"   },
   "Shipped":          { color: "text-violet-600",  bg: "bg-violet-50",  border: "border-violet-200",  dot: "bg-violet-500"  },
