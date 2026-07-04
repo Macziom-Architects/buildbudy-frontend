@@ -2,7 +2,7 @@
 
 import { Suspense, useEffect, useState } from "react";
 import { useRouter, useSearchParams } from "next/navigation";
-import Image from "next/image";
+import SafeImage from "@/components/ui/SafeImage";
 import Link from "next/link";
 import { Loader2 } from "lucide-react";
 import Footer from "@/components/layout/Footer";
@@ -133,7 +133,7 @@ function SuccessContent() {
                 {order.items.map((item, i) => (
                   <div key={i} className="flex items-center gap-2.5">
                     <div className="w-8 h-8 shrink-0 bg-white/10 rounded flex items-center justify-center overflow-hidden">
-                      {item.image && <Image src={item.image} alt={item.name} width={28} height={28} className="object-contain" />}
+                      <SafeImage src={item.image} alt={item.name} width={28} height={28} className="object-contain" />
                     </div>
                     <p className="flex-1 min-w-0 text-xs text-gray-300 truncate">{item.name}</p>
                     <p className="text-xs text-gray-300 shrink-0">×{item.qty}</p>

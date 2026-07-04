@@ -9,6 +9,7 @@ import {
   MapPin, CheckCircle, Loader2,
 } from "lucide-react";
 import { getProfile, updateProfile } from "@/lib/api/auth";
+import { createAddress } from "@/lib/api/addresses";
 
 const STEPS = [
   {
@@ -64,6 +65,7 @@ export default function OnboardingPage() {
   const [answers, setAnswers] = useState(INITIAL);
   const [city, setCity] = useState("");
   const [pincode, setPincode] = useState("");
+  const [addressLine, setAddressLine] = useState("");
   const [locating, setLocating] = useState(false);
   const [done, setDone] = useState(false);
 
@@ -229,13 +231,31 @@ export default function OnboardingPage() {
     return true;
   })();
 
-  function handleContinue() {
+  async function handleContinue() {
     if (step === 4) {
       const loc =
         answers.location ||
         (city.trim() ? { city, pincode: pincode.trim(), type: "manual" } : null);
       const final = { ...answers, location: loc };
       localStorage.setItem("bb_onboarding", JSON.stringify(final));
+
+      // Save a manually entered location as the account's default address so
+      // checkout has one ready to go. Best-effort — never blocks onboarding.
+      // The backend derives city/state from the pincode, so that's all we need.
+      if (pincode.trim().length === 6) {
+        try {
+          await createAddress({
+            label: "Home",
+            line1: addressLine.trim() || "Address not specified",
+            pincode: pincode.trim(),
+            isDefault: true,
+          });
+        } catch {
+          // Unserviceable pincode or network issue — user can add addresses
+          // later from their profile.
+        }
+      }
+
       setDone(true);
       return;
     }
@@ -344,6 +364,14 @@ export default function OnboardingPage() {
               <div className="flex-1 h-px bg-gray-200" />
             </div>
 
+            <input
+              type="text"
+              value={addressLine}
+              onChange={(e) => setAddressLine(e.target.value)}
+              placeholder="Address (optional) — House no, street"
+              className="border border-gray-200 rounded-md px-3 py-2 text-sm text-primary placeholder:text-muted focus:outline-none focus:border-accent transition-colors"
+            />
+
             <div className="flex gap-2">
               <input
                 type="text"
@@ -355,8 +383,9 @@ export default function OnboardingPage() {
               <input
                 type="text"
                 value={pincode}
-                onChange={(e) => setPincode(e.target.value)}
+                onChange={(e) => setPincode(e.target.value.replace(/\D/g, "").slice(0, 6))}
                 placeholder="Pincode"
+                inputMode="numeric"
                 maxLength={6}
                 className="w-28 border border-gray-200 rounded-md px-3 py-2 text-sm text-primary placeholder:text-muted focus:outline-none focus:border-accent transition-colors"
               />

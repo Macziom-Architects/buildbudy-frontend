@@ -1,6 +1,7 @@
 "use client";
 
 import { useState, useEffect } from "react";
+import SafeImage from "@/components/ui/SafeImage";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
 import {
@@ -95,18 +96,13 @@ export default function CartPage() {
                       href={`/products/${item.slug || item.id}`}
                       className="w-[88px] h-[88px] shrink-0 bg-gray-50 border border-gray-100 rounded-xl flex items-center justify-center hover:border-gray-200 transition-colors"
                     >
-                      {item.image ? (
-                        // eslint-disable-next-line @next/next/no-img-element
-                        <img
-                          src={item.image}
-                          alt={item.name}
-                          width={80}
-                          height={80}
-                          className="object-contain"
-                        />
-                      ) : (
-                        <ShoppingCart className="h-8 w-8 text-gray-300" />
-                      )}
+                      <SafeImage
+                        src={item.image}
+                        alt={item.name}
+                        width={80}
+                        height={80}
+                        className="object-contain"
+                      />
                     </Link>
 
                     {/* Info */}

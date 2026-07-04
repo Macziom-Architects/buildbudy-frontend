@@ -2,7 +2,7 @@
 
 import { useEffect, useState } from "react";
 import { useRouter } from "next/navigation";
-import Image from "next/image";
+import SafeImage from "@/components/ui/SafeImage";
 import { AlertCircle, Loader2 } from "lucide-react";
 import { useCart } from "@/context/CartContext";
 import { checkoutCart } from "@/lib/api/cart";
@@ -132,9 +132,7 @@ export default function ReviewPage() {
                   {cartItems.map((item) => (
                     <div key={item.id} className="flex gap-4 items-center py-3 first:pt-0 last:pb-0">
                       <div className="min-w-[80px] h-20 shrink-0 bg-gray-50 border border-gray-100 rounded flex items-center justify-center">
-                        {item.image && (
-                          <Image src={item.image} alt={item.name} width={64} height={64} className="object-contain" />
-                        )}
+                        <SafeImage src={item.image} alt={item.name} width={64} height={64} className="object-contain" />
                       </div>
                       <div className="flex-1 min-w-0">
                         <p className="text-sm font-semibold text-primary leading-snug line-clamp-2">{item.name}</p>

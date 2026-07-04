@@ -1,4 +1,4 @@
-import Image from "next/image";
+import SafeImage from "@/components/ui/SafeImage";
 import Link from "next/link";
 import { notFound } from "next/navigation";
 import {
@@ -395,7 +395,7 @@ export default async function ProductDetailsPage({ params }) {
                       </span>
                     )}
                     <div className="flex aspect-square items-center justify-center p-5">
-                      <Image
+                      <SafeImage
                         src={item.image}
                         alt={item.name}
                         width={240}

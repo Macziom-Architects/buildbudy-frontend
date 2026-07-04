@@ -1,6 +1,6 @@
 "use client";
 
-import Image from "next/image";
+import SafeImage from "@/components/ui/SafeImage";
 import Link from "next/link";
 import { Heart, ShoppingCart, Minus, Plus } from "lucide-react";
 import { useCart } from "@/context/CartContext";
@@ -53,7 +53,6 @@ export default function ProductCard({ product }) {
     : 0;
   const wishlisted = isWishlisted(product.id);
   const hasRating  = product.rating && Number(product.rating) > 0;
-  const imageSrc   = product.image || `https://placehold.co/400x400/f8fafc/132028?text=${encodeURIComponent(product.name?.split(" ").slice(0, 3).join(" ") || "Product")}`;
 
   return (
     <article className="group relative flex h-full flex-col rounded-2xl border border-gray-100 bg-white shadow-sm transition-all duration-200 hover:-translate-y-1 hover:border-gray-200 hover:shadow-lg overflow-hidden cursor-pointer">
@@ -104,8 +103,8 @@ export default function ProductCard({ product }) {
         )}
 
         <div className="flex aspect-square items-center justify-center p-4">
-          <Image
-            src={imageSrc}
+          <SafeImage
+            src={product.image}
             alt={product.name}
             width={200}
             height={200}
