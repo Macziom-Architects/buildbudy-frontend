@@ -1,5 +1,5 @@
 import Link from "next/link";
-import Image from "next/image";
+import SafeImage from "@/components/ui/SafeImage";
 
 function HighlightedHeading({ text, highlight }) {
   if (!highlight || !text.includes(highlight)) return <>{text}</>;
@@ -71,7 +71,7 @@ export default function PromoBanner({
 
               {/* Product image */}
               <div className="relative z-10 w-full max-w-xs md:max-w-sm mx-auto transition-transform duration-500 ease-out hover:-translate-y-2">
-                <Image
+                <SafeImage
                   src={image}
                   alt={imageAlt}
                   width={480}

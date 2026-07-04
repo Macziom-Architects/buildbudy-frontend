@@ -2,183 +2,217 @@
 
 import { useEffect, useState } from "react";
 import { useRouter } from "next/navigation";
-import Image from "next/image";
-import { AlertCircle, Loader2 } from "lucide-react";
+import SafeImage from "@/components/ui/SafeImage";
 import { useCart } from "@/context/CartContext";
-import { checkoutCart } from "@/lib/api/cart";
-import { loadRazorpay, verifyPayment } from "@/lib/api/payments";
 
 function formatPrice(p) {
-  return `₹${(p ?? 0).toLocaleString("en-IN", { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`;
+  return `₹${p.toLocaleString("en-IN", { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`;
 }
 
 const STEPS = [
   { num: "01", label: "Shipping" },
-  { num: "02", label: "Review & Pay" },
+  { num: "02", label: "Payment" },
+  { num: "03", label: "Review" },
 ];
+
+function paymentLabel(payment) {
+  if (!payment) return "—";
+  if (payment.method === "card") {
+    const last4 = payment.card?.number?.replace(/\s/g, "").slice(-4);
+    return `Card ending in ${last4 || "****"}`;
+  }
+  if (payment.method === "upi") return `UPI — ${payment.upi?.id || ""}`;
+  if (payment.method === "netbanking") return `Net Banking — ${payment.bank || ""}`;
+  if (payment.method === "cod") return "Cash on Delivery";
+  return "—";
+}
+
+function generateOrderId() {
+  return "BB" + Date.now().toString(36).toUpperCase() + Math.random().toString(36).slice(2, 5).toUpperCase();
+}
 
 export default function ReviewPage() {
   const router = useRouter();
-  const { cartItems, refreshCart } = useCart();
+  const { cartItems, clearCart } = useCart();
   const [address, setAddress] = useState(null);
+  const [payment, setPayment] = useState(null);
   const [placing, setPlacing] = useState(false);
-  const [error, setError] = useState("");
 
   useEffect(() => {
-    const raw = typeof window !== "undefined" && sessionStorage.getItem("bb_checkout_addr");
-    if (!raw) { router.replace("/checkout/address"); return; }
-    // eslint-disable-next-line react-hooks/set-state-in-effect -- hydrate selected address from sessionStorage on mount
-    setAddress(JSON.parse(raw));
+    const addr = localStorage.getItem("bb_address");
+    const pay = localStorage.getItem("bb_payment");
+    if (!addr) { router.replace("/checkout/address"); return; }
+    if (!pay) { router.replace("/checkout/payment"); return; }
+    // eslint-disable-next-line react-hooks/set-state-in-effect -- hydrate checkout state from localStorage on mount
+    setAddress(JSON.parse(addr));
+    setPayment(JSON.parse(pay));
   }, [router]);
 
-  // TODO(founder decision): no tax shown — see the note in cart/page.jsx
-  // (inclusive-vs-exclusive pricing unresolved; backend currently adds GST
-  // on top at checkout, so the charged amount may exceed this subtotal).
   const subtotal = cartItems.reduce((s, i) => s + i.price * i.quantity, 0);
+  const discount = subtotal * 0.1;
+  const delivery = subtotal > 999 ? 0 : 99;
+  const total = subtotal - discount + delivery;
 
-  async function handlePlaceOrder() {
-    if (!address) return;
+  function handlePlaceOrder() {
     setPlacing(true);
-    setError("");
-    try {
-      const order = await checkoutCart(address.id);
-      // The backend keeps the cart until the payment is confirmed, so a
-      // dismissed widget can retry checkout with the cart intact.
-
-      const Razorpay = await loadRazorpay();
-      const rzp = new Razorpay({
-        key: order.razorpayKeyId,
-        order_id: order.razorpayOrderId,
-        amount: order.totalPaise,
-        currency: "INR",
-        name: "BuildBudy",
-        description: `Order ${order.orderNumber}`,
-        theme: { color: "#0F1E25" },
-        handler: async (response) => {
-          try {
-            await verifyPayment({
-              razorpayOrderId: response.razorpay_order_id,
-              razorpayPaymentId: response.razorpay_payment_id,
-              razorpaySignature: response.razorpay_signature,
-            });
-            sessionStorage.removeItem("bb_checkout_addr");
-            // Payment confirmed — the backend cleared the cart; sync the badge.
-            refreshCart();
-            router.push(`/order/success?orderId=${order.orderId}`);
-          } catch {
-            setError(`Payment went through but we couldn't confirm it. Contact support with order ${order.orderNumber}.`);
-            setPlacing(false);
-          }
-        },
-        modal: { ondismiss: () => setPlacing(false) },
-      });
-      rzp.on("payment.failed", () => {
-        setError("Payment failed or was cancelled. You can try again.");
-        setPlacing(false);
-      });
-      rzp.open();
-    } catch (err) {
-      setError(err?.message || "Couldn't start checkout. Please try again.");
-      setPlacing(false);
-    }
+    // Snapshot everything into sessionStorage before clearing
+    sessionStorage.setItem("bb_order_data", JSON.stringify({
+      orderId: generateOrderId(),
+      address: JSON.parse(localStorage.getItem("bb_address")),
+      payment: JSON.parse(localStorage.getItem("bb_payment")),
+      items: cartItems,
+    }));
+    clearCart();
+    localStorage.removeItem("bb_address");
+    localStorage.removeItem("bb_payment");
+    router.push("/order/success");
   }
 
-  if (!address) return null;
+  if (!address || !payment) return null;
 
   return (
     <main className="min-h-screen bg-[#F5F7FA]">
       <div className="max-w-7xl mx-auto px-4 md:px-6 xl:px-8 py-8">
 
-        {/* Stepper */}
+        {/* STEP INDICATOR */}
         <div className="flex items-center gap-0 mb-8">
-          {STEPS.map((step, idx) => (
-            <div key={step.num} className="flex items-center">
-              <div className={`flex items-center gap-2 px-3 py-1.5 rounded ${idx === 1 ? "bg-primary text-white" : "text-gray-400"}`}>
-                <span className={`text-xs font-bold ${idx === 1 ? "text-accent" : "text-gray-500"}`}>{step.num}</span>
-                <span className={`text-xs font-semibold ${idx === 1 ? "text-white" : "text-gray-400"}`}>{step.label}</span>
+          {STEPS.map((step, idx) => {
+            const isActive = step.num === "03";
+            const isDone = idx < 2;
+            return (
+              <div key={step.num} className="flex items-center">
+                <div className={`flex items-center gap-2 px-3 py-1.5 rounded ${isActive ? "bg-primary text-white" : "text-gray-400"}`}>
+                  <span className={`text-xs font-bold ${isActive ? "text-accent" : isDone ? "text-gray-500" : "text-gray-400"}`}>
+                    {step.num}
+                  </span>
+                  <span className={`text-xs font-semibold ${isActive ? "text-white" : "text-gray-400"}`}>
+                    {step.label}
+                  </span>
+                </div>
+                {idx < STEPS.length - 1 && (
+                  <span className="mx-1 text-gray-300 text-xs">›</span>
+                )}
               </div>
-              {idx < STEPS.length - 1 && <span className="mx-1 text-gray-300 text-xs">›</span>}
-            </div>
-          ))}
+            );
+          })}
         </div>
 
-        <h1 className="text-2xl font-extrabold text-primary tracking-tight">Review &amp; Pay</h1>
-        <p className="text-sm text-muted mt-0.5">Confirm your order, then pay securely with Razorpay.</p>
+        {/* TITLE */}
+        <h1 className="text-2xl font-extrabold text-primary tracking-tight">Review &amp; Place Order</h1>
+        <p className="text-sm text-muted mt-0.5">Check everything before placing your order.</p>
 
         <div className="mt-6 grid lg:grid-cols-[1fr_340px] gap-5 items-start">
           {/* LEFT */}
           <div className="space-y-4">
 
-            {/* Delivery address */}
+            {/* DELIVERY ADDRESS */}
             <div className="bg-white rounded-lg shadow-sm p-5">
               <div className="flex items-center justify-between mb-3">
                 <h2 className="font-bold text-sm text-primary uppercase tracking-wide">Delivery Address</h2>
-                <button onClick={() => router.push("/checkout/address")} className="text-xs font-semibold text-accent hover:underline cursor-pointer">
-                  Change
+                <button
+                  onClick={() => router.push("/checkout/address")}
+                  className="text-xs font-semibold text-accent hover:underline cursor-pointer"
+                >
+                  Edit
                 </button>
               </div>
-              <p className="text-sm font-semibold text-primary">{address.label}</p>
-              <p className="text-sm text-muted mt-0.5">{address.line1}{address.line2 ? `, ${address.line2}` : ""}</p>
-              <p className="text-sm text-muted">{address.city}, {address.state} — {address.pincode}</p>
+              <p className="text-sm font-semibold text-primary">{address.fullName}</p>
+              <p className="text-sm text-muted mt-0.5">{address.addressLine1}</p>
+              {address.addressLine2 && (
+                <p className="text-sm text-muted">{address.addressLine2}</p>
+              )}
+              {address.landmark && (
+                <p className="text-sm text-muted">{address.landmark}</p>
+              )}
+              <p className="text-sm text-muted">
+                {address.city}, {address.state} — {address.pincode}
+              </p>
+              <p className="text-sm text-muted mt-0.5">📞 {address.phone}</p>
             </div>
 
-            {/* Items */}
+            {/* PAYMENT METHOD */}
             <div className="bg-white rounded-lg shadow-sm p-5">
-              <h2 className="font-bold text-sm text-primary uppercase tracking-wide mb-3">Order Items ({cartItems.length})</h2>
-              {cartItems.length === 0 ? (
-                <p className="text-sm text-muted py-4 text-center">Your cart is empty.</p>
-              ) : (
-                <div className="divide-y divide-gray-100">
-                  {cartItems.map((item) => (
-                    <div key={item.id} className="flex gap-4 items-center py-3 first:pt-0 last:pb-0">
-                      <div className="min-w-[80px] h-20 shrink-0 bg-gray-50 border border-gray-100 rounded flex items-center justify-center">
-                        {item.image && (
-                          <Image src={item.image} alt={item.name} width={64} height={64} className="object-contain" />
-                        )}
-                      </div>
-                      <div className="flex-1 min-w-0">
-                        <p className="text-sm font-semibold text-primary leading-snug line-clamp-2">{item.name}</p>
-                        <p className="text-xs text-muted mt-1">Qty: {item.quantity}</p>
-                      </div>
-                      <p className="text-sm font-bold text-primary shrink-0 whitespace-nowrap pl-2">
-                        {formatPrice(item.price * item.quantity)}
-                      </p>
+              <div className="flex items-center justify-between mb-3">
+                <h2 className="font-bold text-sm text-primary uppercase tracking-wide">Payment Method</h2>
+                <button
+                  onClick={() => router.push("/checkout/payment")}
+                  className="text-xs font-semibold text-accent hover:underline cursor-pointer"
+                >
+                  Edit
+                </button>
+              </div>
+              <p className="text-sm text-primary font-medium">{paymentLabel(payment)}</p>
+            </div>
+
+            {/* ORDER ITEMS */}
+            <div className="bg-white rounded-lg shadow-sm p-5">
+              <h2 className="font-bold text-sm text-primary uppercase tracking-wide mb-3">
+                Order Items ({cartItems.length})
+              </h2>
+              <div className="divide-y divide-gray-100">
+                {cartItems.map((item) => (
+                  <div key={item.id} className="flex gap-4 items-center py-3 first:pt-0 last:pb-0">
+                    <div className="min-w-[80px] h-20 shrink-0 bg-gray-50 border border-gray-100 rounded flex items-center justify-center">
+                      <SafeImage
+                        src={item.image}
+                        alt={item.name}
+                        width={64}
+                        height={64}
+                        className="object-contain"
+                      />
                     </div>
-                  ))}
-                </div>
-              )}
+                    <div className="flex-1 min-w-0">
+                      <p className="text-sm font-semibold text-primary leading-snug line-clamp-2">{item.name}</p>
+                      <p className="text-xs text-muted mt-1">Qty: {item.quantity}</p>
+                    </div>
+                    <p className="text-sm font-bold text-primary shrink-0 whitespace-nowrap pl-2">
+                      {formatPrice(item.price * item.quantity)}
+                    </p>
+                  </div>
+                ))}
+              </div>
             </div>
           </div>
 
-          {/* RIGHT — summary + CTA */}
+          {/* RIGHT — SUMMARY + CTA */}
           <div className="space-y-4">
             <div className="bg-[#0F1E25] text-white p-5 rounded-lg shadow-md">
-              <h2 className="font-bold text-base tracking-wide uppercase border-b border-white/10 pb-3">Order Summary</h2>
+              <h2 className="font-bold text-base tracking-wide uppercase border-b border-white/10 pb-3">
+                Order Summary
+              </h2>
               <div className="mt-3 space-y-2.5 text-sm">
+                <div className="flex justify-between items-center">
+                  <span className="text-gray-400">Subtotal</span>
+                  <span className="font-medium">{formatPrice(subtotal)}</span>
+                </div>
+                <div className="flex justify-between items-center">
+                  <span className="text-gray-400">Discount (10%)</span>
+                  <span className="text-green-400 font-medium">−{formatPrice(discount)}</span>
+                </div>
+                <div className="flex justify-between items-center">
+                  <span className="text-gray-400">Delivery</span>
+                  <span className="font-medium">
+                    {delivery === 0 ? <span className="text-green-400">Free</span> : formatPrice(delivery)}
+                  </span>
+                </div>
                 <div className="border-t border-white/10 pt-3 flex justify-between items-center font-bold text-base">
-                  <span>Subtotal</span>
-                  <span className="text-accent text-lg">{formatPrice(subtotal)}</span>
+                  <span>Total</span>
+                  <span className="text-accent text-lg">{formatPrice(total)}</span>
                 </div>
               </div>
               <div className="mt-4 text-xs text-gray-500 space-y-1.5">
-                <p>✔ Secure Razorpay payment</p>
-                <p>✔ GST invoice included</p>
+                <p>✔ Secure payments</p>
+                <p>✔ Fast delivery</p>
+                <p>✔ 30-day guarantee</p>
               </div>
             </div>
 
-            {error && (
-              <div className="flex items-start gap-2 rounded-lg bg-red-50 border border-red-100 p-3 text-xs font-medium text-red-600">
-                <AlertCircle className="h-4 w-4 flex-shrink-0 mt-0.5" /> {error}
-              </div>
-            )}
-
             <button
               onClick={handlePlaceOrder}
-              disabled={placing || cartItems.length === 0}
-              className="w-full bg-accent text-primary font-bold py-2.5 rounded hover:opacity-80 active:scale-[0.98] cursor-pointer transition-all text-sm tracking-wide disabled:opacity-60 disabled:cursor-not-allowed flex items-center justify-center gap-2"
+              disabled={placing}
+              className="w-full bg-accent text-primary font-bold py-2.5 rounded hover:opacity-80 active:scale-[0.98] cursor-pointer transition-all text-sm tracking-wide disabled:opacity-60 disabled:cursor-not-allowed"
             >
-              {placing && <Loader2 className="h-4 w-4 animate-spin" />}
-              {placing ? "PROCESSING…" : "PROCEED TO PAYMENT"}
+              {placing ? "PLACING ORDER…" : "PLACE ORDER"}
             </button>
           </div>
         </div>

@@ -1,7 +1,7 @@
 "use client";
 
 import { useState } from "react";
-import Image from "next/image";
+import SafeImage from "@/components/ui/SafeImage";
 import { ZoomIn } from "lucide-react";
 
 export default function ProductGallery({ product, galleryImages }) {
@@ -12,7 +12,7 @@ export default function ProductGallery({ product, galleryImages }) {
       {/* ── Main image ─────────────────────────────────────────────── */}
       <div className="group relative overflow-hidden rounded-2xl border border-gray-100 bg-gray-50 shadow-sm">
         <div className="flex aspect-square items-center justify-center p-8 sm:aspect-[4/3] md:aspect-square lg:aspect-[4/3]">
-          <Image
+          <SafeImage
             src={selected}
             alt={product.name}
             width={560}
@@ -55,7 +55,7 @@ export default function ProductGallery({ product, galleryImages }) {
                   : "border-transparent hover:border-gray-300 hover:shadow-sm"
               }`}
             >
-              <Image
+              <SafeImage
                 src={img}
                 alt={`${product.name} view ${index + 1}`}
                 width={120}

@@ -1,156 +1,42 @@
 "use client";
 
-import { useState, useSyncExternalStore, useEffect, useCallback, useMemo } from "react";
+import { useState, useEffect, useCallback, useMemo, Suspense } from "react";
 import Link from "next/link";
 import { useRouter, useSearchParams } from "next/navigation";
 import {
   User, MapPin, ShoppingBag, Heart, CreditCard, Settings,
   LogOut, ChevronRight, Plus, Edit2, Trash2, Shield,
-  Package, CheckCircle, Clock, Truck, Home, Bell,
-  Phone, Mail, Camera, X, Loader2, Building2, ArrowRight,
-  Star, Tag, BookOpen, Wrench, AlertCircle, CheckCircle2,
-  XCircle, Calendar,
+  Package, Clock, Truck, Home, Bell,
+  Phone, Camera, Loader2, Building2, ArrowRight,
+  Tag, BookOpen, Wrench, CheckCircle2, XCircle,
 } from "lucide-react";
 import Footer from "@/components/layout/Footer";
+import { Skeleton } from "@/components/ui/Skeleton";
+import { IMAGE_FALLBACK_SRC } from "@/components/ui/SafeImage";
+import AddressFormModal from "@/components/shared/AddressFormModal";
+import { useSelectedAddress } from "@/hooks/useSelectedAddress";
+import { useAuth } from "@/hooks/useAuth";
+import { useOrders } from "@/hooks/useOrders";
+import { useFetch } from "@/hooks/useFetch";
 import { useWishlist } from "@/context/WishlistContext";
 import { useCart } from "@/context/CartContext";
 import { STATUS_CONFIG } from "@/lib/ordersData";
-import { getProfile, updateProfile } from "@/lib/api/auth";
-import { getOrders } from "@/lib/api/orders";
 import {
-  listAddresses, createAddress, updateAddress, deleteAddress, setDefaultAddress,
+  getAddresses,
+  createAddress,
+  updateAddress as apiUpdateAddress,
+  deleteAddress as apiDeleteAddress,
+  setDefaultAddress,
 } from "@/lib/api/addresses";
-import { Suspense } from "react";
-
+import {
+  getNotifications,
+  getUnreadCount as fetchUnreadCount,
+} from "@/lib/api/notifications";
 // ─── Constants ─────────────────────────────────────────────────────────────────
 
-const MOCK_USER = {
-  name: "Ravi Kumar",
-  email: "ravi.kumar@example.com",
-  phone: "+91 98765 43210",
-  avatar: null,
-  memberSince: "Jan 2024",
-};
-
-// Map the backend user ({ fullName, email, phoneNumber, createdAt, ... }) to the
-// shape this page renders ({ name, email, phone, avatar, memberSince }).
-function mapApiUser(api) {
-  if (!api) return MOCK_USER;
-  return {
-    name: api.fullName || "",
-    email: api.email || "",
-    phone: api.phoneNumber || "",
-    avatar: api.avatarUrl || null,
-    memberSince: api.createdAt
-      ? new Date(api.createdAt).toLocaleDateString("en-IN", { month: "short", year: "numeric" })
-      : "",
-  };
-}
-
-// ─── Address Modal ──────────────────────────────────────────────────────────────
-
-const LABEL_OPTIONS = ["Home", "Office", "Other"];
-
-function AddressModal({ address, onClose, onSave }) {
-  const blank = {
-    label: "Home", line1: "", line2: "", pincode: "", isDefault: false,
-  };
-  const [form, setForm] = useState(address ? { ...address } : blank);
-  const [saving, setSaving] = useState(false);
-  const [error, setError] = useState("");
-
-  function field(key) {
-    return (e) => setForm((p) => ({ ...p, [key]: e.target.value }));
-  }
-
-  async function handleSubmit(e) {
-    e.preventDefault();
-    setSaving(true);
-    setError("");
-    try {
-      await onSave(form);
-      onClose();
-    } catch (err) {
-      setError(err?.message || "Could not save address. Please try again.");
-    } finally {
-      setSaving(false);
-    }
-  }
-
-  const inputCls = "w-full border border-gray-200 rounded-lg px-3 py-2.5 text-sm text-primary placeholder:text-muted focus:outline-none focus:border-accent focus:ring-1 focus:ring-accent/30 transition-all";
-
-  return (
-    <div
-      className="fixed inset-0 z-50 flex items-end sm:items-center justify-center bg-black/50 backdrop-blur-sm p-4"
-      onClick={(e) => { if (e.target === e.currentTarget) onClose(); }}
-    >
-      <div className="w-full max-w-lg bg-white rounded-2xl shadow-2xl max-h-[90vh] overflow-y-auto">
-        <div className="flex items-center justify-between px-6 py-4 border-b border-gray-100 sticky top-0 bg-white rounded-t-2xl">
-          <h3 className="text-base font-bold text-primary">
-            {address ? "Edit Address" : "Add New Address"}
-          </h3>
-          <button onClick={onClose} className="p-1.5 rounded-full hover:bg-gray-100 transition-colors cursor-pointer">
-            <X className="h-4 w-4 text-muted" />
-          </button>
-        </div>
-        <form onSubmit={handleSubmit} className="p-6 space-y-4">
-          <div>
-            <label className="text-xs font-semibold text-muted uppercase tracking-wider mb-2 block">Address Type</label>
-            <div className="flex gap-2">
-              {LABEL_OPTIONS.map((opt) => (
-                <button
-                  key={opt} type="button"
-                  onClick={() => setForm((p) => ({ ...p, label: opt }))}
-                  className={`flex items-center gap-1.5 px-4 py-2 rounded-full text-xs font-semibold border transition-all cursor-pointer ${
-                    form.label === opt ? "bg-primary text-white border-primary" : "border-gray-200 text-gray-600 hover:border-primary"
-                  }`}
-                >
-                  {opt === "Home" ? <Home className="h-3 w-3" /> : opt === "Office" ? <Building2 className="h-3 w-3" /> : <MapPin className="h-3 w-3" />}
-                  {opt}
-                </button>
-              ))}
-            </div>
-          </div>
-          <div>
-            <label className="text-xs font-semibold text-muted uppercase tracking-wider mb-1.5 block">Flat / House / Building</label>
-            <input value={form.line1} onChange={field("line1")} required placeholder="Flat no, Building name" className={inputCls} />
-          </div>
-          <div>
-            <label className="text-xs font-semibold text-muted uppercase tracking-wider mb-1.5 block">Area / Street</label>
-            <input value={form.line2} onChange={field("line2")} placeholder="Street, Area, Locality" className={inputCls} />
-          </div>
-          <div>
-            <label className="text-xs font-semibold text-muted uppercase tracking-wider mb-1.5 block">Pincode</label>
-            <input value={form.pincode} onChange={field("pincode")} required placeholder="201301" maxLength={6} pattern="\d{6}" className={inputCls} />
-            <p className="text-[11px] text-muted mt-1.5">City &amp; state are detected automatically from your pincode.</p>
-          </div>
-          <label className="flex items-center gap-3 cursor-pointer group">
-            <div
-              onClick={() => setForm((p) => ({ ...p, isDefault: !p.isDefault }))}
-              className={`h-5 w-5 rounded-md border-2 flex items-center justify-center transition-all cursor-pointer ${
-                form.isDefault ? "bg-primary border-primary" : "border-gray-300 group-hover:border-primary"
-              }`}
-            >
-              {form.isDefault && <CheckCircle className="h-3 w-3 text-white" />}
-            </div>
-            <span className="text-sm font-medium text-primary">Set as default address</span>
-          </label>
-          {error && (
-            <p className="text-xs font-medium text-red-500 bg-red-50 rounded-lg px-3 py-2">{error}</p>
-          )}
-          <div className="flex gap-3 pt-2">
-            <button type="button" onClick={onClose} className="flex-1 py-2.5 rounded-xl border border-gray-200 text-sm font-semibold text-primary hover:bg-gray-50 transition-colors cursor-pointer">
-              Cancel
-            </button>
-            <button type="submit" disabled={saving} className="flex-1 py-2.5 rounded-xl bg-primary text-white text-sm font-bold hover:bg-primary/90 transition-colors disabled:opacity-60 flex items-center justify-center gap-2 cursor-pointer">
-              {saving && <Loader2 className="h-4 w-4 animate-spin" />}
-              {saving ? "Saving…" : "Save Address"}
-            </button>
-          </div>
-        </form>
-      </div>
-    </div>
-  );
+function handleImgError(e) {
+  if (e.currentTarget.src.endsWith(IMAGE_FALLBACK_SRC)) return;
+  e.currentTarget.src = IMAGE_FALLBACK_SRC;
 }
 
 // ─── Section shell ──────────────────────────────────────────────────────────────
@@ -181,84 +67,104 @@ const ORDER_STATUS_ICONS = {
   "Cancelled":        XCircle,
 };
 
-function OrdersSection({ orders, loading }) {
+function OrdersSection({ orders, total, loading }) {
   const recent = orders.slice(0, 3);
+
+  if (loading) {
+    return (
+      <SectionWrapper title="My Orders" subtitle="Loading…">
+        <div className="space-y-3">
+          {[1, 2, 3].map((i) => (
+            <div key={i} className="flex items-center gap-4 p-4 rounded-xl border border-gray-100">
+              <Skeleton className="h-10 w-10 rounded-xl flex-shrink-0" />
+              <div className="flex-1 space-y-2">
+                <div className="flex gap-2">
+                  <Skeleton className="h-3 w-32" />
+                  <Skeleton className="h-3 w-16 rounded-full" />
+                </div>
+                <Skeleton className="h-3 w-48" />
+              </div>
+              <Skeleton className="h-4 w-16 flex-shrink-0" />
+            </div>
+          ))}
+        </div>
+      </SectionWrapper>
+    );
+  }
+
+  if (recent.length === 0) {
+    return (
+      <SectionWrapper title="My Orders" subtitle="0 orders placed">
+        <div className="flex flex-col items-center py-10 text-center">
+          <div className="h-14 w-14 rounded-2xl bg-gray-100 flex items-center justify-center mb-3">
+            <ShoppingBag className="h-7 w-7 text-gray-300" />
+          </div>
+          <p className="text-sm font-bold text-primary mb-1">No orders yet</p>
+          <p className="text-xs text-muted mb-4">Your order history will appear here once you place an order.</p>
+          <Link href="/products" className="inline-flex items-center gap-2 bg-primary text-white text-xs font-semibold px-4 py-2 rounded-lg hover:bg-primary/90 transition-colors">
+            Start Shopping
+          </Link>
+        </div>
+      </SectionWrapper>
+    );
+  }
 
   return (
     <SectionWrapper
       title="My Orders"
-      subtitle={loading ? "Loading…" : `${orders.length} order${orders.length === 1 ? "" : "s"} placed`}
+      subtitle={`${total} order${total !== 1 ? "s" : ""} placed`}
       action={
         <Link href="/orders" className="flex items-center gap-1 text-xs font-semibold text-accent hover:text-accent/80 transition-colors cursor-pointer">
           View All <ArrowRight className="h-3.5 w-3.5" />
         </Link>
       }
     >
-      {loading ? (
-        <div className="flex items-center justify-center gap-2 py-10 text-sm text-muted">
-          <Loader2 className="h-4 w-4 animate-spin" /> Loading orders…
-        </div>
-      ) : orders.length === 0 ? (
-        <div className="flex flex-col items-center py-10 text-center">
-          <ShoppingBag className="h-8 w-8 text-gray-300 mb-3" />
-          <p className="text-sm font-semibold text-primary mb-1">No orders yet</p>
-          <p className="text-xs text-muted mb-4">Your placed orders will show up here.</p>
-          <Link href="/products" className="text-xs font-semibold text-accent hover:text-accent/80 transition-colors">
-            Start shopping →
-          </Link>
-        </div>
-      ) : (
-        <>
-          <div className="space-y-3">
-            {recent.map((order) => {
-              const cfg = STATUS_CONFIG[order.status] ?? STATUS_CONFIG["Placed"];
-              const StatusIcon = ORDER_STATUS_ICONS[order.status] ?? Package;
-              return (
-                <Link
-                  key={order.id}
-                  href={`/orders/${order.id}`}
-                  className="flex items-center gap-4 p-4 rounded-xl border border-gray-100 hover:border-gray-200 hover:shadow-sm transition-all duration-200 cursor-pointer group"
-                >
-                  <div className={`h-10 w-10 rounded-xl flex items-center justify-center flex-shrink-0 ${cfg.bg}`}>
-                    <StatusIcon className={`h-4.5 w-4.5 ${cfg.color}`} style={{ width: 18, height: 18 }} />
-                  </div>
-                  <div className="flex-1 min-w-0">
-                    <div className="flex flex-wrap items-center gap-2 mb-0.5">
-                      <span className="text-xs font-bold text-primary font-mono">{order.orderNumber ?? order.id}</span>
-                      <span className={`inline-flex items-center gap-1 text-[10px] font-semibold px-2 py-0.5 rounded-full ${cfg.bg} ${cfg.color}`}>
-                        <span className={`h-1.5 w-1.5 rounded-full ${cfg.dot}`} />
-                        {order.status}
-                      </span>
-                    </div>
-                    <p className="text-xs text-muted truncate">
-                      {order.itemCount} item{order.itemCount === 1 ? "" : "s"}{order.date ? ` · ${order.date}` : ""}
-                    </p>
-                  </div>
-                  <div className="flex items-center gap-2 flex-shrink-0">
-                    <span className="text-sm font-bold text-primary">₹{order.total.toLocaleString("en-IN", { minimumFractionDigits: 2, maximumFractionDigits: 2 })}</span>
-                    <ChevronRight className="h-4 w-4 text-gray-400 group-hover:text-primary transition-colors" />
-                  </div>
-                </Link>
-              );
-            })}
-          </div>
-
-          <div className="mt-4 pt-4 border-t border-gray-100">
+      <div className="space-y-3">
+        {recent.map((order) => {
+          const cfg = STATUS_CONFIG[order.status] ?? STATUS_CONFIG["Placed"];
+          const StatusIcon = ORDER_STATUS_ICONS[order.status] ?? Package;
+          return (
             <Link
-              href="/orders"
-              className="flex items-center justify-center gap-2 w-full py-2.5 rounded-xl border border-gray-200 text-sm font-semibold text-primary hover:border-primary hover:bg-gray-50 transition-all"
+              key={order.id}
+              href={`/orders/${order.id}`}
+              className="flex items-center gap-4 p-4 rounded-xl border border-gray-100 hover:border-gray-200 hover:shadow-sm transition-all duration-200 cursor-pointer group"
             >
-              <ShoppingBag className="h-4 w-4" />
-              View All Orders
+              <div className={`h-10 w-10 rounded-xl flex items-center justify-center flex-shrink-0 ${cfg.bg}`}>
+                <StatusIcon className={`h-4.5 w-4.5 ${cfg.color}`} style={{ width: 18, height: 18 }} />
+              </div>
+              <div className="flex-1 min-w-0">
+                <div className="flex flex-wrap items-center gap-2 mb-0.5">
+                  <span className="text-xs font-bold text-primary font-mono">{order.id}</span>
+                  <span className={`inline-flex items-center gap-1 text-[10px] font-semibold px-2 py-0.5 rounded-full ${cfg.bg} ${cfg.color}`}>
+                    <span className={`h-1.5 w-1.5 rounded-full ${cfg.dot}`} />
+                    {order.status}
+                  </span>
+                </div>
+                <p className="text-xs text-muted truncate">{order.items.map((i) => i.name).join(", ")}</p>
+              </div>
+              <div className="flex items-center gap-2 flex-shrink-0">
+                <span className="text-sm font-bold text-primary">₹{order.total.toLocaleString("en-IN")}</span>
+                <ChevronRight className="h-4 w-4 text-gray-400 group-hover:text-primary transition-colors" />
+              </div>
             </Link>
-          </div>
-        </>
-      )}
+          );
+        })}
+      </div>
+
+      <div className="mt-4 pt-4 border-t border-gray-100">
+        <Link
+          href="/orders"
+          className="flex items-center justify-center gap-2 w-full py-2.5 rounded-xl border border-gray-200 text-sm font-semibold text-primary hover:border-primary hover:bg-gray-50 transition-all"
+        >
+          <ShoppingBag className="h-4 w-4" />
+          View All Orders
+        </Link>
+      </div>
     </SectionWrapper>
   );
 }
 
-// ─── Wishlist section ────────────────────────────────────────────────────────────
+// ─── Wishlist section (frontend-only, backed by WishlistContext) ─────────────────
 
 function WishlistSection() {
   const { wishlist, removeFromWishlist } = useWishlist();
@@ -313,13 +219,13 @@ function WishlistSection() {
           <div key={product.id} className="flex items-center gap-3 p-3 rounded-xl border border-gray-100 hover:border-gray-200 transition-all">
             <div className="h-12 w-12 rounded-lg bg-gray-100 flex items-center justify-center flex-shrink-0 overflow-hidden">
               {product.image
-                ? <img src={product.image} alt={product.name} className="h-full w-full object-cover" />
+                ? <img src={product.image} alt={product.name} onError={handleImgError} className="h-full w-full object-cover" />
                 : <Package className="h-5 w-5 text-gray-400" />
               }
             </div>
             <div className="flex-1 min-w-0">
               <p className="text-xs font-semibold text-primary leading-snug truncate">{product.name}</p>
-              <p className="text-sm font-bold text-primary mt-0.5">₹{(product.price ?? 0).toLocaleString("en-IN", { minimumFractionDigits: 2, maximumFractionDigits: 2 })}</p>
+              <p className="text-sm font-bold text-primary mt-0.5">₹{(product.price ?? 0).toLocaleString("en-IN")}</p>
             </div>
             <button
               onClick={() => handleMoveToCart(product)}
@@ -342,46 +248,79 @@ function WishlistSection() {
 // ─── Addresses section ──────────────────────────────────────────────────────────
 
 function AddressesSection() {
-  const [addresses, setAddresses] = useState([]);
-  const [loading, setLoading] = useState(true);
   const [modal, setModal] = useState(null);
+  const { data, loading, error, refetch } = useFetch(getAddresses, []);
+  const addresses = data ?? [];
+  const { selectedAddress, selectAddress, clearSelection } = useSelectedAddress();
 
-  const refresh = useCallback(async () => {
-    const list = await listAddresses();
-    setAddresses(list);
-    return list;
-  }, []);
-
-  useEffect(() => {
-    let active = true;
-    listAddresses()
-      .then((list) => { if (active) setAddresses(list); })
-      .catch(() => {})
-      .finally(() => { if (active) setLoading(false); });
-    return () => { active = false; };
-  }, []);
-
-  // Throws on failure so the modal can surface the error (e.g. unserviceable pincode).
   async function handleSave(form) {
-    if (form.id) await updateAddress(form.id, form);
-    else await createAddress(form);
-    await refresh();
+    const saved = form.id
+      ? await apiUpdateAddress(form.id, form)
+      : await createAddress(form);
+    await refetch();
+    // Keep the navbar/checkout selection in sync when the edited/created
+    // address is the one currently selected (or becomes the new default).
+    if (saved?.isDefault || selectedAddress?.id === saved?.id) {
+      selectAddress(saved);
+    }
   }
 
   async function handleDelete(id) {
-    await deleteAddress(id);
-    await refresh();
+    await apiDeleteAddress(id);
+    await refetch();
+    if (selectedAddress?.id === String(id)) {
+      const remaining = await getAddresses();
+      const next = remaining.find((a) => a.isDefault) ?? remaining[0] ?? null;
+      if (next) selectAddress(next);
+      else clearSelection();
+    }
   }
 
   async function handleSetDefault(id) {
     await setDefaultAddress(id);
-    await refresh();
+    await refetch();
+    const updated = await getAddresses();
+    const newDefault = updated.find((a) => a.id === String(id));
+    if (newDefault) selectAddress(newDefault);
+  }
+
+  if (loading) {
+    return (
+      <SectionWrapper title="Saved Addresses" subtitle="Manage your delivery addresses">
+        <div className="grid sm:grid-cols-2 gap-4">
+          {[1, 2].map((i) => (
+            <div key={i} className="p-4 rounded-xl border border-gray-100 space-y-3">
+              <div className="flex items-center gap-2">
+                <Skeleton className="h-7 w-7 rounded-lg" />
+                <Skeleton className="h-4 w-20" />
+              </div>
+              <Skeleton className="h-3 w-32" />
+              <Skeleton className="h-3 w-full max-w-[200px]" />
+              <Skeleton className="h-3 w-40" />
+            </div>
+          ))}
+        </div>
+      </SectionWrapper>
+    );
+  }
+
+  if (error) {
+    return (
+      <SectionWrapper title="Saved Addresses" subtitle="Manage your delivery addresses">
+        <div className="flex flex-col items-center py-8 text-center">
+          <p className="text-sm text-red-500 mb-3">Failed to load addresses.</p>
+          <button onClick={refetch} className="text-xs font-semibold text-accent hover:underline cursor-pointer">
+            Try again
+          </button>
+        </div>
+      </SectionWrapper>
+    );
   }
 
   return (
     <>
       {modal !== null && (
-        <AddressModal
+        <AddressFormModal
           address={modal === "add" ? null : modal}
           onClose={() => setModal(null)}
           onSave={handleSave}
@@ -396,64 +335,65 @@ function AddressesSection() {
           </button>
         }
       >
-        {loading ? (
-          <div className="flex items-center justify-center gap-2 py-12 text-sm text-muted">
-            <Loader2 className="h-4 w-4 animate-spin" /> Loading addresses…
-          </div>
-        ) : (
-          <div className="grid sm:grid-cols-2 gap-4">
-            {addresses.map((addr) => (
-              <div
-                key={addr.id}
-                className="relative p-4 rounded-xl border-2 hover:shadow-md transition-all duration-200"
-                style={{ borderColor: addr.isDefault ? "#F0C12D" : "#f3f4f6" }}
-              >
-                {addr.isDefault && (
-                  <span className="absolute top-3 right-3 text-[10px] font-bold bg-accent text-primary px-2 py-0.5 rounded-full">Default</span>
-                )}
-                <div className="flex items-center gap-2 mb-3">
-                  <div className="h-7 w-7 rounded-lg bg-primary/10 flex items-center justify-center">
-                    {addr.label === "Home" ? <Home className="h-3.5 w-3.5 text-primary" /> : addr.label === "Office" ? <Building2 className="h-3.5 w-3.5 text-primary" /> : <MapPin className="h-3.5 w-3.5 text-primary" />}
-                  </div>
-                  <span className="text-sm font-bold text-primary">{addr.label}</span>
-                </div>
-                <p className="text-sm text-gray-700 font-medium">{addr.line1}</p>
-                {addr.line2 && <p className="text-xs text-muted mt-0.5">{addr.line2}</p>}
-                <p className="text-xs text-muted mt-0.5">{addr.city}, {addr.state} — {addr.pincode}</p>
-                <div className="flex items-center gap-3 mt-4 pt-3 border-t border-gray-100">
-                  <button onClick={() => setModal(addr)} className="flex items-center gap-1 text-xs font-medium text-primary hover:text-accent transition-colors cursor-pointer">
-                    <Edit2 className="h-3 w-3" /> Edit
-                  </button>
-                  {!addr.isDefault && (
-                    <>
-                      <button onClick={() => handleDelete(addr.id)} className="flex items-center gap-1 text-xs font-medium text-muted hover:text-red-500 transition-colors cursor-pointer">
-                        <Trash2 className="h-3 w-3" /> Remove
-                      </button>
-                      <button onClick={() => handleSetDefault(addr.id)} className="ml-auto text-xs font-medium text-accent hover:text-accent/80 transition-colors cursor-pointer">
-                        Set Default
-                      </button>
-                    </>
-                  )}
-                </div>
-              </div>
-            ))}
-            <button
-              onClick={() => setModal("add")}
-              className="flex flex-col items-center justify-center gap-2 p-4 rounded-xl border-2 border-dashed border-gray-200 hover:border-accent hover:bg-accent/5 transition-all duration-200 cursor-pointer group min-h-[160px]"
+        <div className="grid sm:grid-cols-2 gap-4">
+          {addresses.map((addr) => (
+            <div
+              key={addr.id}
+              className="relative p-4 rounded-xl border-2 hover:shadow-md transition-all duration-200"
+              style={{ borderColor: addr.isDefault ? "#F0C12D" : "#f3f4f6" }}
             >
-              <div className="h-10 w-10 rounded-full bg-gray-100 group-hover:bg-accent/10 flex items-center justify-center transition-colors">
-                <Plus className="h-5 w-5 text-gray-400 group-hover:text-accent transition-colors" />
+              {addr.isDefault && (
+                <span className="absolute top-3 right-3 text-[10px] font-bold bg-accent text-primary px-2 py-0.5 rounded-full">Default</span>
+              )}
+              <div className="flex items-center gap-2 mb-3">
+                <div className="h-7 w-7 rounded-lg bg-primary/10 flex items-center justify-center">
+                  {addr.label === "Home"
+                    ? <Home className="h-3.5 w-3.5 text-primary" />
+                    : addr.label === "Office"
+                      ? <Building2 className="h-3.5 w-3.5 text-primary" />
+                      : <MapPin className="h-3.5 w-3.5 text-primary" />
+                  }
+                </div>
+                <span className="text-sm font-bold text-primary">{addr.label}</span>
               </div>
-              <span className="text-sm font-semibold text-gray-500 group-hover:text-primary transition-colors">Add New Address</span>
-            </button>
-          </div>
-        )}
+              <p className="text-sm text-gray-700 font-medium">{addr.name}</p>
+              <p className="text-xs text-muted mt-1">{addr.line1}</p>
+              {addr.line2 && <p className="text-xs text-muted">{addr.line2}</p>}
+              <p className="text-xs text-muted">{addr.city}, {addr.state} — {addr.pincode}</p>
+              <p className="text-xs text-muted mt-1">{addr.phone}</p>
+              <div className="flex items-center gap-3 mt-4 pt-3 border-t border-gray-100">
+                <button onClick={() => setModal(addr)} className="flex items-center gap-1 text-xs font-medium text-primary hover:text-accent transition-colors cursor-pointer">
+                  <Edit2 className="h-3 w-3" /> Edit
+                </button>
+                {!addr.isDefault && (
+                  <>
+                    <button onClick={() => handleDelete(addr.id)} className="flex items-center gap-1 text-xs font-medium text-muted hover:text-red-500 transition-colors cursor-pointer">
+                      <Trash2 className="h-3 w-3" /> Remove
+                    </button>
+                    <button onClick={() => handleSetDefault(addr.id)} className="ml-auto text-xs font-medium text-accent hover:text-accent/80 transition-colors cursor-pointer">
+                      Set Default
+                    </button>
+                  </>
+                )}
+              </div>
+            </div>
+          ))}
+          <button
+            onClick={() => setModal("add")}
+            className="flex flex-col items-center justify-center gap-2 p-4 rounded-xl border-2 border-dashed border-gray-200 hover:border-accent hover:bg-accent/5 transition-all duration-200 cursor-pointer group min-h-[160px]"
+          >
+            <div className="h-10 w-10 rounded-full bg-gray-100 group-hover:bg-accent/10 flex items-center justify-center transition-colors">
+              <Plus className="h-5 w-5 text-gray-400 group-hover:text-accent transition-colors" />
+            </div>
+            <span className="text-sm font-semibold text-gray-500 group-hover:text-primary transition-colors">Add New Address</span>
+          </button>
+        </div>
       </SectionWrapper>
     </>
   );
 }
 
-// ─── Notifications section ──────────────────────────────────────────────────────
+// ─── Notifications section (API-backed, placeholder for backend push) ────────────
 
 const NOTIF_TYPE_CONFIG = {
   order:   { icon: Package,    bg: "bg-blue-50",    text: "text-blue-600"    },
@@ -465,24 +405,34 @@ const NOTIF_TYPE_CONFIG = {
 };
 
 function NotificationsSection() {
-  // Notifications have no backend yet (deferred — MSG91/D4 on hold), so there is no
-  // live data to show. Render the honest empty state instead of mock seeds.
-  const [notifs] = useState([]);
-
+  const { data, loading } = useFetch(() => getNotifications(), []);
+  const notifs = data ?? [];
   const recent = notifs.slice(0, 5);
   const unread = notifs.filter((n) => !n.read).length;
 
   return (
     <SectionWrapper
       title="Notifications"
-      subtitle={unread > 0 ? `${unread} unread` : "All caught up"}
+      subtitle={loading ? "Loading…" : unread > 0 ? `${unread} unread` : "All caught up"}
       action={
         <Link href="/notifications" className="flex items-center gap-1 text-xs font-semibold text-accent hover:text-accent/80 transition-colors">
           View All <ArrowRight className="h-3.5 w-3.5" />
         </Link>
       }
     >
-      {recent.length === 0 ? (
+      {loading ? (
+        <div className="space-y-2.5">
+          {[1, 2, 3].map((i) => (
+            <div key={i} className="flex items-start gap-3 p-3 rounded-xl border border-gray-100">
+              <Skeleton className="h-8 w-8 rounded-lg flex-shrink-0" />
+              <div className="flex-1 space-y-2">
+                <Skeleton className="h-3 w-3/4" />
+                <Skeleton className="h-2.5 w-1/3" />
+              </div>
+            </div>
+          ))}
+        </div>
+      ) : recent.length === 0 ? (
         <div className="flex flex-col items-center py-10 text-center">
           <Bell className="h-8 w-8 text-gray-300 mb-3" />
           <p className="text-sm font-semibold text-primary mb-1">No notifications</p>
@@ -527,7 +477,7 @@ function NotificationsSection() {
   );
 }
 
-// ─── Saved Payments section ─────────────────────────────────────────────────────
+// ─── Saved Payments section (frontend placeholder) ──────────────────────────────
 
 function PaymentsSection() {
   return (
@@ -552,33 +502,25 @@ function PaymentsSection() {
 
 // ─── Settings section ───────────────────────────────────────────────────────────
 
-function SettingsSection() {
-  const [user, setUser] = useState({ name: "", email: "", phone: "", avatar: null, memberSince: "" });
+function SettingsSection({ user, onUpdateProfile }) {
+  const [form, setForm] = useState({ name: user?.name ?? "", phone: user?.phone ?? "" });
   const [saved, setSaved] = useState(false);
   const [saving, setSaving] = useState(false);
-  const [error, setError] = useState("");
-  const [notifications, setNotifications] = useState({ email: true, sms: true, push: false });
+  const [notifications, setNotifications] = useState({ sms: true, push: false });
 
   useEffect(() => {
-    getProfile().then((u) => setUser(mapApiUser(u))).catch(() => {});
-  }, []);
+    // eslint-disable-next-line react-hooks/set-state-in-effect -- sync form when the fetched user profile arrives
+    if (user) setForm({ name: user.name ?? "", phone: user.phone ?? "" });
+  }, [user]);
 
   async function handleSave() {
     setSaving(true);
-    setError("");
     try {
-      // Backend PATCH /users/me accepts fullName + email; phone is the login
-      // identity and is not editable here.
-      const updated = await updateProfile({ fullName: user.name, email: user.email });
-      setUser(mapApiUser(updated));
+      await onUpdateProfile({ name: form.name });
       setSaved(true);
       setTimeout(() => setSaved(false), 2500);
-    } catch (err) {
-      // e.g. 400 "This email is already in use"
-      setError(err?.message || "Could not save your changes. Please try again.");
-    } finally {
-      setSaving(false);
-    }
+    } catch {}
+    setSaving(false);
   }
 
   const inputCls = "w-full pl-9 pr-4 py-2.5 text-sm border border-gray-200 rounded-lg focus:outline-none focus:border-accent focus:ring-1 focus:ring-accent/30 transition-all";
@@ -591,28 +533,30 @@ function SettingsSection() {
             <label className="block text-xs font-semibold text-muted mb-1.5 uppercase tracking-wider">Full Name</label>
             <div className="relative">
               <User className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-gray-400" />
-              <input value={user.name} onChange={(e) => setUser((p) => ({ ...p, name: e.target.value }))} className={inputCls} />
+              <input
+                value={form.name}
+                onChange={(e) => setForm((p) => ({ ...p, name: e.target.value }))}
+                placeholder="Your name"
+                className={inputCls}
+              />
             </div>
           </div>
           <div>
-            <label className="block text-xs font-semibold text-muted mb-1.5 uppercase tracking-wider">Email Address</label>
-            <div className="relative">
-              <Mail className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-gray-400" />
-              <input value={user.email} onChange={(e) => setUser((p) => ({ ...p, email: e.target.value }))} type="email" className={inputCls} />
-            </div>
-          </div>
-          <div>
-            <label className="block text-xs font-semibold text-muted mb-1.5 uppercase tracking-wider">Phone Number</label>
+            <label className="block text-xs font-semibold text-muted mb-1.5 uppercase tracking-wider">Mobile Number</label>
             <div className="relative">
               <Phone className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-gray-400" />
-              <input value={user.phone} readOnly disabled className={`${inputCls} bg-gray-50 text-muted cursor-not-allowed`} />
+              <input
+                value={form.phone}
+                readOnly
+                title="Mobile number is verified and cannot be changed here"
+                className={`${inputCls} bg-gray-50 cursor-not-allowed`}
+              />
             </div>
-            <p className="text-[11px] text-muted mt-1">Phone number is your login ID and can&apos;t be changed.</p>
+            <p className="text-[11px] text-muted mt-1 flex items-center gap-1">
+              <Shield className="h-3 w-3 text-emerald-500" /> Verified number — contact support to change
+            </p>
           </div>
         </div>
-        {error && (
-          <p className="mt-4 text-xs text-red-500 bg-red-50 border border-red-100 rounded-md px-3 py-2">{error}</p>
-        )}
         <div className="mt-5 flex items-center gap-3">
           <button onClick={handleSave} disabled={saving} className="px-5 py-2.5 bg-primary text-white text-sm font-semibold rounded-lg hover:bg-primary/90 transition-colors cursor-pointer disabled:opacity-60 flex items-center gap-2">
             {saving && <Loader2 className="h-3.5 w-3.5 animate-spin" />}
@@ -625,9 +569,8 @@ function SettingsSection() {
       <SectionWrapper title="Notification Preferences" subtitle="Choose how you hear from us">
         <div className="space-y-4">
           {[
-            { key: "email", label: "Email Notifications", sub: "Order updates, promotions, and newsletters" },
-            { key: "sms",   label: "SMS Alerts",          sub: "Delivery updates and OTP messages" },
-            { key: "push",  label: "Push Notifications",  sub: "Browser and app alerts" },
+            { key: "sms",  label: "SMS Alerts",         sub: "Delivery updates and OTP messages" },
+            { key: "push", label: "Push Notifications", sub: "Browser and app alerts" },
           ].map(({ key, label, sub }) => (
             <div key={key} className="flex items-center justify-between gap-4">
               <div>
@@ -646,29 +589,18 @@ function SettingsSection() {
         </div>
       </SectionWrapper>
 
-      <SectionWrapper title="Security" subtitle="Manage your password and account security">
+      <SectionWrapper title="Security" subtitle="Manage your account security">
         <div className="space-y-3">
-          {[
-            { icon: Shield, label: "Two-Factor Authentication", sub: "Add an extra layer of security",  href: null },
-          ].map(({ icon: Icon, label, sub, href }) => {
-            const Wrapper = href ? Link : "button";
-            return (
-              <Wrapper
-                key={label}
-                {...(href ? { href } : {})}
-                className="w-full flex items-center gap-4 p-4 rounded-xl hover:bg-gray-50 transition-colors text-left cursor-pointer group"
-              >
-                <div className="h-9 w-9 rounded-xl bg-primary/5 flex items-center justify-center flex-shrink-0 group-hover:bg-primary/10 transition-colors">
-                  <Icon className="h-4 w-4 text-primary" />
-                </div>
-                <div className="flex-1 min-w-0">
-                  <p className="text-sm font-semibold text-primary">{label}</p>
-                  <p className="text-xs text-muted">{sub}</p>
-                </div>
-                <ChevronRight className="h-4 w-4 text-gray-400 group-hover:text-primary transition-colors flex-shrink-0" />
-              </Wrapper>
-            );
-          })}
+          <div className="flex items-center gap-4 p-4 rounded-xl bg-emerald-50 border border-emerald-100">
+            <div className="h-9 w-9 rounded-xl bg-emerald-100 flex items-center justify-center flex-shrink-0">
+              <Shield className="h-4 w-4 text-emerald-600" />
+            </div>
+            <div className="flex-1 min-w-0">
+              <p className="text-sm font-semibold text-primary">Mobile OTP Verified</p>
+              <p className="text-xs text-muted">Your account is secured with mobile OTP authentication</p>
+            </div>
+            <CheckCircle2 className="h-5 w-5 text-emerald-500 flex-shrink-0" />
+          </div>
         </div>
       </SectionWrapper>
     </div>
@@ -681,60 +613,56 @@ function ProfilePageInner() {
   const searchParams = useSearchParams();
   const initialSection = searchParams.get("section") ?? "orders";
   const [activeSection, setActiveSection] = useState(initialSection);
-  const [user, setUser] = useState({ name: "", email: "", phone: "", avatar: null, memberSince: "" });
-  const [orders, setOrders] = useState(null); // null = loading; shared by badge, stat, and OrdersSection
-  const [unreadCount] = useState(0); // notifications backend deferred — no unread to show yet
+  const [unreadCount, setUnreadCount] = useState(0);
   const router = useRouter();
+
+  const { isLoggedIn, user, logout, updateProfile, loading: authLoading } = useAuth();
+  const { orders, total: ordersTotal, loading: ordersLoading } = useOrders();
   const { wishlist } = useWishlist();
 
-  const isLoggedIn = useSyncExternalStore(
-    (cb) => { window.addEventListener("storage", cb); return () => window.removeEventListener("storage", cb); },
-    () => !!localStorage.getItem("bb_logged_in"),
-    () => false,
-  );
+  useEffect(() => {
+    if (!authLoading && !isLoggedIn) {
+      router.replace("/auth/login");
+    }
+  }, [isLoggedIn, authLoading, router]);
 
   useEffect(() => {
-    if (typeof window === "undefined") return;
-    if (!localStorage.getItem("bb_logged_in")) {
-      router.replace("/auth/login");
-      return;
-    }
-    getProfile()
-      .then((u) => setUser(mapApiUser(u)))
+    if (!isLoggedIn) return;
+    fetchUnreadCount()
+      .then((count) => setUnreadCount(typeof count === "number" ? count : 0))
       .catch(() => {});
-    getOrders()
-      .then((res) => setOrders(res.orders ?? []))
-      .catch(() => setOrders([]));
-  }, [router]);
+  }, [isLoggedIn]);
 
   const SIDEBAR_ITEMS = useMemo(() => [
-    { id: "orders",        label: "My Orders",       icon: ShoppingBag, badge: orders && orders.length > 0 ? orders.length : null },
-    { id: "addresses",     label: "Saved Addresses", icon: MapPin       },
-    { id: "wishlist",      label: "Wishlist",         icon: Heart,       badge: wishlist.length > 0 ? wishlist.length : null },
-    { id: "notifications", label: "Notifications",   icon: Bell,        badge: unreadCount > 0 ? unreadCount : null },
-    { id: "payments",      label: "Saved Payments",  icon: CreditCard   },
-    { id: "settings",      label: "Account Settings", icon: Settings    },
-  ], [orders, wishlist.length, unreadCount]);
+    { id: "orders",        label: "My Orders",        icon: ShoppingBag, badge: ordersTotal > 0 ? ordersTotal : null },
+    { id: "addresses",     label: "Saved Addresses",  icon: MapPin       },
+    { id: "wishlist",      label: "Wishlist",          icon: Heart,       badge: wishlist.length > 0 ? wishlist.length : null },
+    { id: "notifications", label: "Notifications",    icon: Bell,        badge: unreadCount > 0 ? unreadCount : null },
+    { id: "payments",      label: "Saved Payments",   icon: CreditCard   },
+    { id: "settings",      label: "Account Settings", icon: Settings     },
+  ], [ordersTotal, wishlist.length, unreadCount]);
 
-  const handleLogout = () => {
-    localStorage.removeItem("bb_logged_in");
-    window.dispatchEvent(new Event("storage"));
+  const handleLogout = useCallback(async () => {
+    await logout();
     router.push("/auth/login");
-  };
+  }, [logout, router]);
 
   const renderSection = () => {
     switch (activeSection) {
-      case "orders":        return <OrdersSection orders={orders ?? []} loading={orders === null} />;
+      case "orders":        return <OrdersSection orders={orders} total={ordersTotal} loading={ordersLoading} />;
       case "addresses":     return <AddressesSection />;
       case "wishlist":      return <WishlistSection />;
       case "notifications": return <NotificationsSection />;
       case "payments":      return <PaymentsSection />;
-      case "settings":      return <SettingsSection />;
+      case "settings":      return <SettingsSection user={user} onUpdateProfile={updateProfile} />;
       default:              return null;
     }
   };
 
-  const initials = (user.name || "").split(" ").map((n) => n[0]).filter(Boolean).join("").slice(0, 2).toUpperCase();
+  const displayName    = user?.name        ?? "BuildBudy User";
+  const displayPhone   = user?.phone       ?? "";
+  const displaySince   = user?.memberSince ?? "";
+  const initials       = displayName.split(" ").map((n) => n[0]).join("").slice(0, 2).toUpperCase() || "BB";
 
   return (
     <div className="flex min-h-screen flex-col bg-[#F5F6FA]">
@@ -742,60 +670,78 @@ function ProfilePageInner() {
       {/* ── Profile header ──────────────────────────────────────────── */}
       <div className="bg-primary px-4 py-10 sm:px-6 lg:px-8">
         <div className="mx-auto max-w-[1400px]">
-          <div className="flex flex-col sm:flex-row items-start sm:items-center gap-5">
-
-            {/* Avatar */}
-            <div className="relative flex-shrink-0">
-              <div className="h-20 w-20 rounded-2xl bg-accent/20 flex items-center justify-center border-2 border-accent/30">
-                {user.avatar
-                  ? <img src={user.avatar} alt="" className="h-full w-full object-cover rounded-2xl" />
-                  : <span className="text-2xl font-bold text-accent">{initials}</span>
-                }
+          {authLoading ? (
+            <div className="flex flex-col sm:flex-row items-start sm:items-center gap-5">
+              <Skeleton className="h-20 w-20 rounded-2xl flex-shrink-0 bg-white/20" />
+              <div className="flex-1 space-y-3">
+                <Skeleton className="h-6 w-48 bg-white/20" />
+                <Skeleton className="h-4 w-64 bg-white/10" />
               </div>
-              <button
-                onClick={() => setActiveSection("settings")}
-                className="absolute -bottom-1.5 -right-1.5 h-7 w-7 rounded-full bg-accent text-primary flex items-center justify-center shadow-md hover:bg-accent/90 transition-colors cursor-pointer"
-              >
-                <Camera className="h-3.5 w-3.5" />
-              </button>
-            </div>
-
-            {/* Info */}
-            <div className="flex-1 min-w-0">
-              <h1 className="text-xl font-bold text-white">{user.name}</h1>
-              <p className="text-sm text-white/60 mt-0.5">{user.email}</p>
-              <div className="flex flex-wrap items-center gap-3 mt-2.5">
-                {user.phone && (
-                  <span className="inline-flex items-center gap-1.5 text-xs text-white/50">
-                    <Phone className="h-3 w-3" /> {user.phone}
-                  </span>
-                )}
-                <span className="inline-flex items-center gap-1.5 text-xs">
-                  <Shield className="h-3 w-3 text-emerald-400" />
-                  <span className="text-emerald-400 font-medium">Verified</span>
-                </span>
-                {user.memberSince && <span className="text-xs text-white/40">Member since {user.memberSince}</span>}
+              <div className="flex gap-5">
+                {[1, 2, 3].map((i) => (
+                  <div key={i} className="text-center space-y-1.5">
+                    <Skeleton className="h-6 w-8 mx-auto bg-white/20" />
+                    <Skeleton className="h-3 w-14 bg-white/10" />
+                  </div>
+                ))}
               </div>
             </div>
+          ) : (
+            <div className="flex flex-col sm:flex-row items-start sm:items-center gap-5">
 
-            {/* Quick stats */}
-            <div className="flex gap-5 flex-shrink-0">
-              {[
-                { label: "Orders",   value: orders?.length ?? 0, section: "orders"    },
-                { label: "Wishlist", value: wishlist.length,    section: "wishlist"  },
-                { label: "Alerts",   value: unreadCount,        section: "notifications" },
-              ].map(({ label, value, section }) => (
+              {/* Avatar */}
+              <div className="relative flex-shrink-0">
+                <div className="h-20 w-20 rounded-2xl bg-accent/20 flex items-center justify-center border-2 border-accent/30">
+                  {user?.avatar
+                    ? <img src={user.avatar} alt="" onError={handleImgError} className="h-full w-full object-cover rounded-2xl" />
+                    : <span className="text-2xl font-bold text-accent">{initials}</span>
+                  }
+                </div>
                 <button
-                  key={label}
-                  onClick={() => setActiveSection(section)}
-                  className="text-center cursor-pointer group"
+                  onClick={() => setActiveSection("settings")}
+                  className="absolute -bottom-1.5 -right-1.5 h-7 w-7 rounded-full bg-accent text-primary flex items-center justify-center shadow-md hover:bg-accent/90 transition-colors cursor-pointer"
                 >
-                  <p className="text-xl font-bold text-white group-hover:text-accent transition-colors">{value}</p>
-                  <p className="text-xs text-white/50 mt-0.5">{label}</p>
+                  <Camera className="h-3.5 w-3.5" />
                 </button>
-              ))}
+              </div>
+
+              {/* Info */}
+              <div className="flex-1 min-w-0">
+                <h1 className="text-xl font-bold text-white">{displayName}</h1>
+                <p className="text-sm text-white/60 mt-0.5">BuildBudy Member</p>
+                <div className="flex flex-wrap items-center gap-3 mt-2.5">
+                  {displayPhone && (
+                    <span className="inline-flex items-center gap-1.5 text-xs text-white/50">
+                      <Phone className="h-3 w-3" /> {displayPhone}
+                    </span>
+                  )}
+                  <span className="inline-flex items-center gap-1.5 text-xs">
+                    <Shield className="h-3 w-3 text-emerald-400" />
+                    <span className="text-emerald-400 font-medium">Verified</span>
+                  </span>
+                  {displaySince && <span className="text-xs text-white/40">Member since {displaySince}</span>}
+                </div>
+              </div>
+
+              {/* Quick stats */}
+              <div className="flex gap-5 flex-shrink-0">
+                {[
+                  { label: "Orders",   value: ordersTotal,      section: "orders"        },
+                  { label: "Wishlist", value: wishlist.length,  section: "wishlist"      },
+                  { label: "Alerts",   value: unreadCount,      section: "notifications" },
+                ].map(({ label, value, section }) => (
+                  <button
+                    key={label}
+                    onClick={() => setActiveSection(section)}
+                    className="text-center cursor-pointer group"
+                  >
+                    <p className="text-xl font-bold text-white group-hover:text-accent transition-colors">{value}</p>
+                    <p className="text-xs text-white/50 mt-0.5">{label}</p>
+                  </button>
+                ))}
+              </div>
             </div>
-          </div>
+          )}
         </div>
       </div>
 

@@ -1,5 +1,5 @@
 import Link from "next/link";
-import Image from "next/image";
+import SafeImage from "@/components/ui/SafeImage";
 import { Sparkles, ArrowRight } from "lucide-react";
 import { fetchEssentialProducts } from "@/lib/api/products";
 
@@ -49,7 +49,7 @@ function HighlightCard({ product }) {
             -{discount}%
           </span>
         )}
-        <Image
+        <SafeImage
           src={image}
           alt={name}
           fill
@@ -100,7 +100,7 @@ function MiniCard({ product }) {
       className="group flex gap-3 bg-white rounded-xl p-3 shadow-sm hover:shadow-md hover:scale-[1.02] transition-all duration-300"
     >
       <div className="relative w-20 h-20 flex-shrink-0 rounded-lg overflow-hidden bg-gray-50">
-        <Image
+        <SafeImage
           src={image}
           alt={name}
           fill

@@ -46,7 +46,7 @@ export default function RootLayout({ children }) {
         )}
 
         {/* Main Content */}
-        <div className="flex flex-1 flex-col pb-20 md:pb-0">{children}</div>
+        <div className="flex flex-1 flex-col">{children}</div>
         {!isAuthPage && <MobileNavbar />}
         </CartProvider>
 

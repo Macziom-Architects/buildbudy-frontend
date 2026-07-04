@@ -1,5 +1,5 @@
 import Link from "next/link";
-import Image from "next/image";
+import SafeImage from "@/components/ui/SafeImage";
 import { Zap, ArrowRight } from "lucide-react";
 
 function ComboTag({ label }) {
@@ -25,7 +25,7 @@ export default function ServiceCard({
     >
       {/* Image */}
       <div className="relative aspect-[16/9] overflow-hidden rounded-t-xl bg-gray-100">
-        <Image
+        <SafeImage
           src={image}
           alt={name}
           fill

@@ -103,7 +103,7 @@ async function request(method, path, { body, params, token } = {}) {
         try {
           localStorage.removeItem("bb_auth_token");
           localStorage.removeItem("bb_logged_in");
-          localStorage.removeItem("bb_user_profile");
+          localStorage.removeItem("bb_active_phone");
           window.dispatchEvent(new Event("storage"));
         } catch {}
         if (!window.location.pathname.startsWith("/auth")) {

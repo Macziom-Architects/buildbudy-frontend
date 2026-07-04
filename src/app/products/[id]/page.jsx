@@ -1,4 +1,4 @@
-import Image from "next/image";
+import SafeImage from "@/components/ui/SafeImage";
 import Link from "next/link";
 import { notFound } from "next/navigation";
 import {
@@ -125,7 +125,7 @@ export default async function ProductDetailsPage({ params }) {
 
   return (
     <div className="flex flex-1 flex-col bg-[#F5F6F8]">
-      <main className="mx-auto w-full max-w-[1200px] px-4 pb-28 pt-5 sm:px-6 md:pb-12 lg:px-8">
+      <main className="mx-auto w-full max-w-[1200px] px-4 pb-16 pt-5 sm:px-6 md:pb-12 lg:px-8">
 
         {/* ── Breadcrumb ─────────────────────────────────────────────── */}
         <nav aria-label="Breadcrumb" className="mb-5 flex flex-wrap items-center gap-1.5 text-xs text-muted">
@@ -395,7 +395,7 @@ export default async function ProductDetailsPage({ params }) {
                       </span>
                     )}
                     <div className="flex aspect-square items-center justify-center p-5">
-                      <Image
+                      <SafeImage
                         src={item.image}
                         alt={item.name}
                         width={240}

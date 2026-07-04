@@ -1,7 +1,7 @@
 "use client";
 
 import Link from "next/link";
-import Image from "next/image";
+import SafeImage from "@/components/ui/SafeImage";
 import { Star, ShoppingCart } from "lucide-react";
 import { useCart } from "@/context/CartContext";
 
@@ -74,7 +74,7 @@ export default function ProductCard({
           )}
 
           {/* Product image — zooms on card hover */}
-          <Image
+          <SafeImage
             src={image}
             alt={name}
             fill
