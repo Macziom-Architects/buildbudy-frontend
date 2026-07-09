@@ -4,11 +4,17 @@ import { Sparkles, ArrowRight } from "lucide-react";
 import { fetchEssentialProducts } from "@/lib/api/products";
 
 const BADGE_COLORS = {
-  "Best Seller": "bg-accent text-primary",
-  "Top Rated":   "bg-primary text-white",
-  "New":         "bg-emerald-500 text-white",
-  "Sale":        "bg-red-500 text-white",
-  "Featured":    "bg-primary text-accent",
+  "Best Seller":      "bg-accent text-primary",
+  "Top Rated":        "bg-primary text-white",
+  "New":              "bg-emerald-500 text-white",
+  "Sale":             "bg-red-500 text-white",
+  "Featured":         "bg-primary text-accent",
+  "Limited Offer":    "bg-red-500 text-white",
+  "BuildBudy Choice": "bg-primary text-accent",
+  "Fast Selling":     "bg-orange-500 text-white",
+  "New Arrival":      "bg-emerald-500 text-white",
+  "Free Delivery":    "bg-sky-600 text-white",
+  "Limited Stock":    "bg-amber-600 text-white",
 };
 
 function UseCasePill({ label }) {

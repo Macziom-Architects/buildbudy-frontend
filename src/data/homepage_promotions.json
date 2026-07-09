@@ -1,0 +1,192 @@
+{
+  "heroCarousel": [
+    {
+      "id": "monsoon-construction-sale",
+      "label": "SEASONAL SALE",
+      "title": "Monsoon Construction Sale",
+      "highlight": "Monsoon",
+      "subtitle": "Up to 35% off waterproofing compounds, sealants & monsoon-ready construction essentials.",
+      "discountLabel": "UP TO 35% OFF",
+      "badge": "Limited Period",
+      "ctaText": "Shop the Sale",
+      "ctaHref": "/materials?search=waterproofing",
+      "image": "https://placehold.co/1200x800/0d1c24/F0C12D?text=Monsoon+Construction+Sale",
+      "imageAlt": "Monsoon construction sale — waterproofing materials",
+      "theme": "dark"
+    },
+    {
+      "id": "waterproofing-week",
+      "label": "CATEGORY WEEK",
+      "title": "Waterproofing Week",
+      "highlight": "Waterproofing",
+      "subtitle": "Protect your home before the rains hit. Premium membranes, coatings & sealants at special prices.",
+      "discountLabel": "FLAT 25% OFF",
+      "badge": "This Week Only",
+      "ctaText": "Explore Waterproofing",
+      "ctaHref": "/materials?search=waterproofing",
+      "image": "https://placehold.co/1200x800/132028/F0C12D?text=Waterproofing+Week",
+      "imageAlt": "Waterproofing week promotion",
+      "theme": "dark"
+    },
+    {
+      "id": "cement-mega-sale",
+      "title": "Cement Mega Sale",
+      "label": "BULK DEAL",
+      "highlight": "Cement",
+      "subtitle": "Save big on bulk cement orders. Flat ₹40 off per bag when you order 10 bags or more.",
+      "discountLabel": "₹40 OFF PER BAG",
+      "badge": "Bulk Offer",
+      "ctaText": "Order in Bulk",
+      "ctaHref": "/materials?search=cement",
+      "image": "https://placehold.co/1200x800/1b3242/F0C12D?text=Cement+Mega+Sale",
+      "imageAlt": "Cement mega sale promotion",
+      "theme": "dark"
+    },
+    {
+      "id": "professional-tool-festival",
+      "label": "TOOL FESTIVAL",
+      "title": "Professional Tool Festival",
+      "highlight": "Tool Festival",
+      "subtitle": "Power tools, hand tools & pro equipment at festival prices. Gear up your toolbox today.",
+      "discountLabel": "UP TO 40% OFF",
+      "badge": "Trending",
+      "ctaText": "Shop Tools",
+      "ctaHref": "/tools",
+      "image": "https://placehold.co/1200x800/0d1c24/F0C12D?text=Professional+Tool+Festival",
+      "imageAlt": "Professional tool festival promotion",
+      "theme": "dark"
+    },
+    {
+      "id": "electrical-safety-week",
+      "label": "SAFETY FIRST",
+      "title": "Electrical Safety Week",
+      "highlight": "Safety",
+      "subtitle": "ISI-certified wires, switches & safety gear. Because every connection should be a safe one.",
+      "discountLabel": "FLAT 20% OFF",
+      "badge": "Certified Safe",
+      "ctaText": "Shop Electrical",
+      "ctaHref": "/electrical",
+      "image": "https://placehold.co/1200x800/132028/F0C12D?text=Electrical+Safety+Week",
+      "imageAlt": "Electrical safety week promotion",
+      "theme": "dark"
+    },
+    {
+      "id": "interior-finishing-offers",
+      "label": "FINISHING TOUCHES",
+      "title": "Interior Finishing Offers",
+      "highlight": "Finishing",
+      "subtitle": "Premium paints, tiles & fittings to give your interiors the finish they deserve.",
+      "discountLabel": "UP TO 30% OFF",
+      "badge": "New Range",
+      "ctaText": "Shop Interiors",
+      "ctaHref": "/paint",
+      "image": "https://placehold.co/1200x800/1b3242/F0C12D?text=Interior+Finishing+Offers",
+      "imageAlt": "Interior finishing offers promotion",
+      "theme": "dark"
+    },
+    {
+      "id": "buy-more-save-more",
+      "label": "TIERED SAVINGS",
+      "title": "Buy More, Save More",
+      "highlight": "Save More",
+      "subtitle": "Unlock bigger discounts as you add more to cart — up to 20% off on your entire order.",
+      "discountLabel": "UP TO 20% OFF",
+      "badge": "Site-wide",
+      "ctaText": "Start Shopping",
+      "ctaHref": "/products",
+      "image": "https://placehold.co/1200x800/0d1c24/F0C12D?text=Buy+More+Save+More",
+      "imageAlt": "Buy more save more promotion",
+      "theme": "dark"
+    }
+  ],
+
+  "flashSale": {
+    "id": "buildbudy-flash-sale",
+    "label": "FLASH SALE",
+    "title": "Cement & Tools Flash Deal",
+    "subtitle": "Extra savings on best-selling cement and power tools — for a limited number of hours only.",
+    "discountLabel": "EXTRA 15% OFF",
+    "durationHours": 18,
+    "ctaText": "Grab the Deal",
+    "ctaHref": "/products?search=cement",
+    "image": "https://placehold.co/900x700/0d1c24/F0C12D?text=Flash+Sale"
+  },
+
+  "twoColumnPromo": {
+    "label": "LIMITED TIME OFFER",
+    "heading": "Flat 25% Off on Waterproofing Week Essentials",
+    "highlight": "25%",
+    "subtext": "Membranes, coatings and sealants to keep your home dry and damage-free this monsoon.",
+    "ctaText": "Shop Waterproofing",
+    "ctaHref": "/materials?search=waterproofing",
+    "image": "/paint.jpg",
+    "imageAlt": "Waterproofing products"
+  },
+
+  "promoGrid": [
+    {
+      "id": "professional-tool-festival-grid",
+      "title": "Professional Tool Festival",
+      "subtitle": "Power & hand tools for every job",
+      "discountLabel": "UP TO 40% OFF",
+      "badge": "Trending",
+      "ctaText": "Shop Tools",
+      "ctaHref": "/tools",
+      "image": "/tools.jpg",
+      "bg": "from-[#0d1c24] to-[#1b3242]"
+    },
+    {
+      "id": "electrical-safety-week-grid",
+      "title": "Electrical Safety Week",
+      "subtitle": "Certified wires & safety gear",
+      "discountLabel": "FLAT 20% OFF",
+      "badge": "Certified Safe",
+      "ctaText": "Shop Electrical",
+      "ctaHref": "/electrical",
+      "image": "https://placehold.co/400x300/fef3c7/92400e?text=Electrical",
+      "bg": "from-[#132028] to-[#0d1c24]"
+    },
+    {
+      "id": "interior-finishing-offers-grid",
+      "title": "Interior Finishing Offers",
+      "subtitle": "Premium paints, tiles & fittings",
+      "discountLabel": "UP TO 30% OFF",
+      "badge": "New Range",
+      "ctaText": "Shop Interiors",
+      "ctaHref": "/paint",
+      "image": "/paint.jpg",
+      "bg": "from-[#1b3242] to-[#132028]"
+    },
+    {
+      "id": "buy-more-save-more-grid",
+      "title": "Buy More, Save More",
+      "subtitle": "Bigger baskets, bigger discounts",
+      "discountLabel": "UP TO 20% OFF",
+      "badge": "Site-wide",
+      "ctaText": "Start Shopping",
+      "ctaHref": "/products",
+      "image": "/hardware.jpg",
+      "bg": "from-[#0d1c24] to-[#132028]"
+    }
+  ],
+
+  "horizontalBanners": {
+    "freeDelivery": {
+      "id": "free-delivery-above-999",
+      "title": "Free Delivery on Orders Above ₹999",
+      "subtitle": "No hidden charges. Fast doorstep delivery on every eligible order, pan-India.",
+      "ctaText": "Start Shopping",
+      "ctaHref": "/products"
+    },
+    "buildYourDreamHome": {
+      "id": "build-your-dream-home",
+      "label": "PARTNER OFFER",
+      "title": "Build Your Dream Home",
+      "subtitle": "Flexible EMI plans starting at ₹999/month on materials, tools and complete home-building bundles.",
+      "ctaText": "Explore EMI Plans",
+      "ctaHref": "/products",
+      "image": "/appliance.jpg",
+      "imageAlt": "Build your dream home"
+    }
+  }
+}

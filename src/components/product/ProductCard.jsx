@@ -34,11 +34,17 @@ function StarRating({ rating }) {
 }
 
 const BADGE_STYLE = {
-  "Best Seller": "bg-accent text-primary",
-  "Featured":    "bg-primary text-accent",
-  "New":         "bg-emerald-500 text-white",
-  "Sale":        "bg-red-500 text-white",
-  "Trending":    "bg-violet-600 text-white",
+  "Best Seller":      "bg-accent text-primary",
+  "Featured":         "bg-primary text-accent",
+  "New":              "bg-emerald-500 text-white",
+  "Sale":             "bg-red-500 text-white",
+  "Trending":         "bg-violet-600 text-white",
+  "Limited Offer":    "bg-red-500 text-white",
+  "BuildBudy Choice": "bg-primary text-accent",
+  "Fast Selling":     "bg-orange-500 text-white",
+  "New Arrival":      "bg-emerald-500 text-white",
+  "Free Delivery":    "bg-sky-600 text-white",
+  "Limited Stock":    "bg-amber-600 text-white",
 };
 
 export default function ProductCard({ product }) {
